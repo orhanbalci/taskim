@@ -1,4 +1,3 @@
-// src/TaskCalendar.js
 import React, { useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';

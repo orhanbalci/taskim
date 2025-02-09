@@ -1,63 +1,101 @@
-// src/TaskManagerCalendar.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import moment from 'moment';
+import CustomMonthView from './CustomMonthView';
 import WeekView from './WeekView';
 import QuarterView from './QuarterView';
-import CustomMonthView from './CustomMonthView';
+import TaskView from './TaskView';
+import SearchResults from './SearchResults';
 
 const TaskManagerCalendar = () => {
-  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
+  // Use today's date as the initial current date.
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
+  const [events, setEvents] = useState([]);
+  const [weeklyGoals, setWeeklyGoals] = useState({});
+  const [dailyGoals] = useState({}); // For week view; not used in this example.
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [searchText, setSearchText] = useState('');
 
-  const [events, setEvents] = useState([
-    {
-      id: 0,
-      title: 'Initial Task',
-      start: new Date(),
-      end: new Date(new Date().getTime() + 60 * 60 * 1000),
-    },
-  ]);
+  // Load persistent data from localStorage when the component mounts.
+  useEffect(() => {
+    const storedEvents = localStorage.getItem('events');
+    if (storedEvents) setEvents(JSON.parse(storedEvents));
 
-  // Weekly goals keyed by ISO week (e.g., "2025-07")
-  const [weeklyGoals, setWeeklyGoals] = useState({
-    '2025-07': 'Build this app',
-  });
+    const storedGoals = localStorage.getItem('weeklyGoals');
+    if (storedGoals) setWeeklyGoals(JSON.parse(storedGoals));
+  }, []);
 
-  // Daily goals for week view
-  const [dailyGoals, setDailyGoals] = useState({
-    '2025-02-08': 'Call client',
-  });
+  // Persist events to localStorage when they change.
+  useEffect(() => {
+    localStorage.setItem('events', JSON.stringify(events));
+  }, [events]);
 
-  const headerStyle = {
-    background: '#1f1f1f',
-    padding: '1rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  // Persist weekly goals.
+  useEffect(() => {
+    localStorage.setItem('weeklyGoals', JSON.stringify(weeklyGoals));
+  }, [weeklyGoals]);
+
+  // Navigation function: adjust the currentDate based on view and direction.
+  const navigate = (direction) => {
+    let newDate = moment(currentDate);
+    if (direction === 'today') {
+      newDate = moment();
+    } else {
+      if (currentView === 'month') {
+        newDate = direction === 'prev' ? newDate.subtract(1, 'month') : newDate.add(1, 'month');
+      } else if (currentView === 'week') {
+        newDate = direction === 'prev' ? newDate.subtract(1, 'week') : newDate.add(1, 'week');
+      } else if (currentView === 'quarter') {
+        newDate = direction === 'prev' ? newDate.subtract(3, 'month') : newDate.add(3, 'month');
+      }
+    }
+    setCurrentDate(newDate.toDate());
   };
 
-  const buttonStyle = {
-    background: '#333',
-    color: '#fff',
-    border: 'none',
-    padding: '0.5rem 1rem',
-    margin: '0 0.5rem',
-    cursor: 'pointer',
-    borderRadius: '4px',
+  // Open the task view modal when a task is double-clicked.
+  const handleTaskDoubleClick = (task) => {
+    setSelectedTask(task);
   };
 
+  // (For brevity, the search functionality here uses a simple search.)
   return (
     <div style={{ background: '#121212', color: '#fff', minHeight: '100vh' }}>
-      <header style={headerStyle}>
+      <header
+        style={{
+          background: '#1f1f1f',
+          padding: '1rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <div>
-          <button style={buttonStyle} onClick={() => setCurrentView('month')}>
-            Month View
-          </button>
-          <button style={buttonStyle} onClick={() => setCurrentView('week')}>
-            Week View
-          </button>
-          <button style={buttonStyle} onClick={() => setCurrentView('quarter')}>
-            Quarter View
-          </button>
+          <button onClick={() => navigate('prev')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Prev</button>
+          <button onClick={() => navigate('today')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Today</button>
+          <button onClick={() => navigate('next')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Next</button>
+        </div>
+        <div>
+          <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Month View</button>
+          <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Week View</button>
+          <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Quarter View</button>
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '4px',
+              border: 'none',
+              outline: 'none',
+              background: '#333',
+              color: '#fff',
+              margin: '0.25rem',
+            }}
+          />
         </div>
       </header>
       <main style={{ padding: '1rem' }}>
@@ -68,6 +106,7 @@ const TaskManagerCalendar = () => {
             setWeeklyGoals={setWeeklyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
+            onTaskDoubleClick={handleTaskDoubleClick}
           />
         )}
         {currentView === 'week' && (
@@ -75,8 +114,8 @@ const TaskManagerCalendar = () => {
             events={events}
             dailyGoals={dailyGoals}
             currentDate={currentDate}
-            onNavigate={(date) => setCurrentDate(date)}
             setEvents={setEvents}
+            onTaskDoubleClick={handleTaskDoubleClick}
           />
         )}
         {currentView === 'quarter' && (
@@ -87,6 +126,29 @@ const TaskManagerCalendar = () => {
           />
         )}
       </main>
+      {selectedTask && (
+        <TaskView
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdateTask={(updatedTask) => {
+            setEvents((prev) =>
+              prev.map((ev) => (ev.id === updatedTask.id ? updatedTask : ev))
+            );
+          }}
+        />
+      )}
+      {searchText && (
+        <SearchResults
+          searchText={searchText}
+          events={events}
+          weeklyGoals={weeklyGoals}
+          onClose={() => setSearchText('')}
+          onTaskDoubleClick={(task) => {
+            setSelectedTask(task);
+            setSearchText('');
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,8 +1,7 @@
-// src/DraggableTask.js
 import React from 'react';
 import { useDrag } from 'react-dnd';
 
-const DraggableTask = ({ event }) => {
+const DraggableTask = ({ event, onDoubleClick }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'TASK',
     item: { event },
@@ -14,6 +13,7 @@ const DraggableTask = ({ event }) => {
   return (
     <div
       ref={drag}
+      onDoubleClick={() => onDoubleClick && onDoubleClick(event)}
       style={{
         opacity: isDragging ? 0.5 : 1,
         background: '#444',

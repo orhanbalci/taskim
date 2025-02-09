@@ -1,4 +1,3 @@
-// src/QuarterView.js
 import React from 'react';
 import moment from 'moment';
 
@@ -34,8 +33,20 @@ const QuarterView = ({ events, weeklyGoals, currentDate }) => {
             moment(event.start).isBetween(weekStart, weekEnd, null, '[]')
           ).length;
           return (
-            <div key={weekKey} style={{ padding: '0.5rem 0', borderBottom: '1px solid #333' }}>
-              <strong>Week {weekStart.isoWeek()}:</strong> {goal} ({taskCount} tasks scheduled)
+            <div
+              key={weekKey}
+              style={{
+                padding: '0.5rem 0',
+                borderBottom: '1px solid #333',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>
+                <strong>Week {weekStart.isoWeek()}:</strong> {goal}
+              </span>
+              <span>({taskCount} tasks scheduled)</span>
             </div>
           );
         })}
