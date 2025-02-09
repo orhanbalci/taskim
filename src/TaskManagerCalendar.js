@@ -7,35 +7,31 @@ import TaskView from './TaskView';
 import SearchResults from './SearchResults';
 
 const TaskManagerCalendar = () => {
-  // Use today's date as the initial current date.
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
   const [events, setEvents] = useState([]);
   const [weeklyGoals, setWeeklyGoals] = useState({});
-  const [dailyGoals] = useState({}); // For week view; not used in this example.
+  const [dailyGoals] = useState({}); // For week view; not used here.
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState('');
 
-  // Load persistent data from localStorage when the component mounts.
+  // Load persistent data (for production, replace these with API calls to your SQL DB)
   useEffect(() => {
     const storedEvents = localStorage.getItem('events');
     if (storedEvents) setEvents(JSON.parse(storedEvents));
-
     const storedGoals = localStorage.getItem('weeklyGoals');
     if (storedGoals) setWeeklyGoals(JSON.parse(storedGoals));
   }, []);
 
-  // Persist events to localStorage when they change.
   useEffect(() => {
     localStorage.setItem('events', JSON.stringify(events));
   }, [events]);
 
-  // Persist weekly goals.
   useEffect(() => {
     localStorage.setItem('weeklyGoals', JSON.stringify(weeklyGoals));
   }, [weeklyGoals]);
 
-  // Navigation function: adjust the currentDate based on view and direction.
+  // Navigation: adjust the currentDate based on view and direction.
   const navigate = (direction) => {
     let newDate = moment(currentDate);
     if (direction === 'today') {
@@ -52,12 +48,11 @@ const TaskManagerCalendar = () => {
     setCurrentDate(newDate.toDate());
   };
 
-  // Open the task view modal when a task is double-clicked.
-  const handleTaskDoubleClick = (task) => {
+  // Open TaskView when a task is shift-clicked.
+  const handleTaskShiftClick = (task) => {
     setSelectedTask(task);
   };
 
-  // (For brevity, the search functionality here uses a simple search.)
   return (
     <div style={{ background: '#121212', color: '#fff', minHeight: '100vh' }}>
       <header
@@ -106,7 +101,7 @@ const TaskManagerCalendar = () => {
             setWeeklyGoals={setWeeklyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
-            onTaskDoubleClick={handleTaskDoubleClick}
+            onTaskShiftClick={handleTaskShiftClick}
           />
         )}
         {currentView === 'week' && (
@@ -115,7 +110,7 @@ const TaskManagerCalendar = () => {
             dailyGoals={dailyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
-            onTaskDoubleClick={handleTaskDoubleClick}
+            onTaskShiftClick={handleTaskShiftClick}
           />
         )}
         {currentView === 'quarter' && (
@@ -143,7 +138,7 @@ const TaskManagerCalendar = () => {
           events={events}
           weeklyGoals={weeklyGoals}
           onClose={() => setSearchText('')}
-          onTaskDoubleClick={(task) => {
+          onTaskShiftClick={(task) => {
             setSelectedTask(task);
             setSearchText('');
           }}

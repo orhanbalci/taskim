@@ -3,9 +3,8 @@ import moment from 'moment';
 import { useDrop } from 'react-dnd';
 import DraggableTask from './DraggableTask';
 
-// The DayCell component renders a single <td> cell.
-const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskDoubleClick }) => {
-  // Always call useDrop at the top level.
+// DayCell renders a single table cell (<td>) for a day.
+const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftClick }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'TASK',
     drop: (item) => {
@@ -27,28 +26,26 @@ const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskDoubleCl
         background: isOver ? '#3a3a3a' : '#1e1e1e',
         cursor: 'pointer',
       }}
-      onDoubleClick={() => handleAddTask(day)}
+      onDoubleClick={() => handleAddTask(day)} // Double-click to add a new task.
     >
       <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
         {day ? day.format('D') : ''}
       </div>
       <div style={{ fontSize: '0.8rem' }}>
         {(dayEvents || []).map((ev) => (
-          <DraggableTask key={ev.id} event={ev} onDoubleClick={onTaskDoubleClick} />
+          <DraggableTask key={ev.id} event={ev} onShiftClick={onTaskShiftClick} />
         ))}
       </div>
     </td>
   );
 };
 
-const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents, onTaskDoubleClick }) => {
-  // Calculate grid boundaries.
+const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents, onTaskShiftClick }) => {
   const startOfMonth = moment(currentDate).startOf('month');
   const endOfMonth = moment(currentDate).endOf('month');
-  const startDate = moment(startOfMonth).startOf('week'); // start at Sunday
-  const endDate = moment(endOfMonth).endOf('week');         // end at Saturday
+  const startDate = moment(startOfMonth).startOf('week');
+  const endDate = moment(endOfMonth).endOf('week');
 
-  // Build weeks array (each week is an array of 7 moment objects).
   let day = startDate.clone();
   const weeks = [];
   while (day.isBefore(endDate) || day.isSame(endDate, 'day')) {
@@ -60,7 +57,6 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
     weeks.push(week);
   }
 
-  // Update a task’s date when dropped on a new day.
   const updateTaskDate = (taskId, newDay) => {
     setEvents((prevEvents) =>
       prevEvents.map((ev) => {
@@ -79,7 +75,6 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
     );
   };
 
-  // Allow adding a new task via double-click.
   const handleAddTask = (day) => {
     const title = prompt(`Enter task title for ${day.format('MMM D, YYYY')}:`);
     if (title) {
@@ -93,9 +88,8 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
     }
   };
 
-  // Update the weekly goal for this week.
   const updateWeeklyGoal = (weekKey, value) => {
-    setWeeklyGoals((prevGoals) => ({ ...prevGoals, [weekKey]: value }));
+    setWeeklyGoals((prev) => ({ ...prev, [weekKey]: value }));
   };
 
   return (
@@ -107,10 +101,7 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
         <thead>
           <tr>
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName) => (
-              <th
-                key={dayName}
-                style={{ border: '1px solid #333', padding: '0.5rem', background: '#1e1e1e', color: '#fff' }}
-              >
+              <th key={dayName} style={{ border: '1px solid #333', padding: '0.5rem', background: '#1e1e1e', color: '#fff' }}>
                 {dayName}
               </th>
             ))}
@@ -122,29 +113,18 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
             const weekGoal = weeklyGoals[weekKey] || '';
             return (
               <React.Fragment key={`${weekKey}-${wi}`}>
-                {/* Editable weekly goal row */}
                 <tr>
                   <td colSpan="7" style={{ background: '#2e2e2e', padding: '0.5rem', border: '1px solid #333' }}>
-                    <span style={{ marginRight: '0.5rem' }}>
-                      Week {week[0].isoWeek()} Goal:
-                    </span>
+                    <span style={{ marginRight: '0.5rem' }}>Week {week[0].isoWeek()} Goal:</span>
                     <input
                       type="text"
                       value={weekGoal}
                       onChange={(e) => updateWeeklyGoal(weekKey, e.target.value)}
                       placeholder="Enter goal..."
-                      style={{
-                        background: '#444',
-                        color: '#fff',
-                        border: 'none',
-                        outline: 'none',
-                        padding: '0.25rem',
-                        width: '70%',
-                      }}
+                      style={{ background: '#444', color: '#fff', border: 'none', outline: 'none', padding: '0.25rem', width: '70%' }}
                     />
                   </td>
                 </tr>
-                {/* Dates row */}
                 <tr>
                   {week.map((d, di) => {
                     const dayEvents = events.filter((ev) => moment(ev.start).isSame(d, 'day'));
@@ -155,7 +135,7 @@ const CustomMonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, set
                         dayEvents={dayEvents}
                         updateTaskDate={updateTaskDate}
                         handleAddTask={handleAddTask}
-                        onTaskDoubleClick={onTaskDoubleClick}
+                        onTaskShiftClick={onTaskShiftClick}
                       />
                     );
                   })}

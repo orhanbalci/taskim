@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const modalOverlayStyle = {
   position: 'fixed',
   top: 0,
   left: 0,
-  width: '100%',
-  height: '100%',
+  right: 0,
+  bottom: 0,
   background: 'rgba(0,0,0,0.7)',
   display: 'flex',
   justifyContent: 'center',
@@ -28,94 +28,102 @@ const panelContainerStyle = {
   display: 'flex',
   flex: 1,
   marginTop: '1rem',
+  gap: '1rem',
 };
 
 const panelStyle = {
   flex: 1,
-  margin: '0 0.5rem',
   background: '#2e2e2e',
   borderRadius: '4px',
   padding: '0.5rem',
   overflowY: 'auto',
-  maxHeight: '300px',
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.5rem',
+  background: '#444',
+  border: 'none',
+  outline: 'none',
+  color: '#fff',
+  borderRadius: '4px',
+  marginTop: '0.5rem',
 };
 
 const TaskView = ({ task, onClose, onUpdateTask }) => {
   const [subtaskInput, setSubtaskInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
+  const modalRef = useRef(null);
 
-  // Add a subtask to the task.
+  // Close on Escape key.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Close on clicking outside.
+  const handleOverlayClick = (e) => {
+    if (modalRef.current && !modalRef.current.contains(e.target)) {
+      onClose();
+    }
+  };
+
   const addSubtask = () => {
     if (!subtaskInput.trim()) return;
     const newSubtask = { id: Date.now(), title: subtaskInput };
-    const updatedTask = {
-      ...task,
-      subtasks: [...(task.subtasks || []), newSubtask],
-    };
+    const updatedTask = { ...task, subtasks: [...(task.subtasks || []), newSubtask] };
     onUpdateTask(updatedTask);
     setSubtaskInput('');
   };
 
-  // Add a comment to the task.
   const addComment = () => {
     if (!commentInput.trim()) return;
     const newComment = { id: Date.now(), text: commentInput };
-    const updatedTask = {
-      ...task,
-      comments: [...(task.comments || []), newComment],
-    };
+    const updatedTask = { ...task, comments: [...(task.comments || []), newComment] };
     onUpdateTask(updatedTask);
     setCommentInput('');
   };
 
   return (
-    <div style={modalOverlayStyle} onClick={onClose}>
-      <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-        <h2>{task.title}</h2>
-        <button
-          style={{ alignSelf: 'flex-end', background: '#444', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
-          onClick={onClose}
-        >
-          Close
-        </button>
+    <div style={modalOverlayStyle} onClick={handleOverlayClick}>
+      <div style={modalContentStyle} ref={modalRef}>
+        <h2 style={{ margin: 0, color: '#fff' }}>{task.title}</h2>
         <div style={panelContainerStyle}>
-          {/* Subtasks Panel */}
+          {/* Subtasks panel */}
           <div style={panelStyle}>
-            <h3>Subtasks</h3>
-            {(task.subtasks || []).map((st) => (
-              <div key={st.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-                {st.title}
+            {(task.subtasks || []).map((subtask) => (
+              <div key={subtask.id} style={{ display: 'flex', alignItems: 'center', padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
+                <span style={{ marginRight: '0.5rem', fontSize: '1.2rem', color: '#fff' }}>○</span>
+                <span style={{ color: '#fff' }}>{subtask.title}</span>
               </div>
             ))}
-            <div style={{ marginTop: '0.5rem' }}>
-              <input
-                type="text"
-                placeholder="Add subtask..."
-                value={subtaskInput}
-                onChange={(e) => setSubtaskInput(e.target.value)}
-                style={{ width: '80%', padding: '0.25rem', borderRadius: '4px', border: 'none', outline: 'none', background: '#444', color: '#fff' }}
-              />
-              <button onClick={addSubtask} style={{ marginLeft: '0.5rem', background: '#333', color: '#fff', border: 'none', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>Add</button>
-            </div>
+            <input
+              type="text"
+              placeholder="Add subtask"
+              value={subtaskInput}
+              onChange={(e) => setSubtaskInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }}
+              style={inputStyle}
+            />
           </div>
-          {/* Comments Panel */}
+          {/* Comments panel */}
           <div style={panelStyle}>
-            <h3>Comments</h3>
-            {(task.comments || []).map((c) => (
-              <div key={c.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-                {c.text}
+            {(task.comments || []).map((comment) => (
+              <div key={comment.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333', color: '#fff' }}>
+                {comment.text}
               </div>
             ))}
-            <div style={{ marginTop: '0.5rem' }}>
-              <input
-                type="text"
-                placeholder="Add comment..."
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                style={{ width: '80%', padding: '0.25rem', borderRadius: '4px', border: 'none', outline: 'none', background: '#444', color: '#fff' }}
-              />
-              <button onClick={addComment} style={{ marginLeft: '0.5rem', background: '#333', color: '#fff', border: 'none', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>Send</button>
-            </div>
+            <input
+              type="text"
+              placeholder="Add comment"
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addComment(); }}
+              style={inputStyle}
+            />
           </div>
         </div>
       </div>

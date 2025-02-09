@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDrag } from 'react-dnd';
 
-const DraggableTask = ({ event, onDoubleClick }) => {
+const DraggableTask = ({ event, onShiftClick }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'TASK',
     item: { event },
@@ -13,7 +13,7 @@ const DraggableTask = ({ event, onDoubleClick }) => {
   return (
     <div
       ref={drag}
-      onDoubleClick={() => onDoubleClick && onDoubleClick(event)}
+      onClick={(e) => { if (e.shiftKey) onShiftClick && onShiftClick(event); }}
       style={{
         opacity: isDragging ? 0.5 : 1,
         background: '#444',
