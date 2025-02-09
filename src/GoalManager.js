@@ -13,7 +13,6 @@ const GoalManager = () => {
   };
 
   const handleSave = () => {
-    // In a real app, you’d persist these goals to your backend or local storage.
     alert('Goals saved:\n' + JSON.stringify(goals, null, 2));
   };
 

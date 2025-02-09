@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Tasks and Goals",
+  "name": "Task and Goal Manager",
   "icons": [
     {
       "src": "favicon.ico",

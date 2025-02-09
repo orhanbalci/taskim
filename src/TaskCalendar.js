@@ -60,7 +60,7 @@ const TaskCalendar = () => {
         localizer={localizer}
         events={events}
         defaultView="month"
-        views={['month', 'week', 'day']}  // You can customize available views.
+        views={['month', 'week', 'day']}
         onEventDrop={onEventDrop}
         onEventResize={onEventResize}
         resizable

@@ -11,14 +11,22 @@ const TaskManagerCalendar = () => {
   const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
   const [events, setEvents] = useState([]);
   const [weeklyGoals, setWeeklyGoals] = useState({});
-  const [dailyGoals] = useState({}); // For week view; not used here.
+  const [dailyGoals] = useState({});
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState('');
 
-  // Load persistent data (for production, replace these with API calls to your SQL DB)
+  // Load persistent data from localStorage
   useEffect(() => {
     const storedEvents = localStorage.getItem('events');
-    if (storedEvents) setEvents(JSON.parse(storedEvents));
+    if (storedEvents) {
+      // Convert start/end back to Date objects
+      const parsed = JSON.parse(storedEvents).map((ev) => ({
+        ...ev,
+        start: new Date(ev.start),
+        end: new Date(ev.end),
+      }));
+      setEvents(parsed);
+    }
     const storedGoals = localStorage.getItem('weeklyGoals');
     if (storedGoals) setWeeklyGoals(JSON.parse(storedGoals));
   }, []);

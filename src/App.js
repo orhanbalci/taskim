@@ -1,6 +1,6 @@
 import React from 'react';
 import TaskManagerCalendar from './TaskManagerCalendar';
-import './index.css'; // Ensure your global styles are imported
+import './index.css'; 
 
 function App() {
   return <TaskManagerCalendar />;

@@ -9,107 +9,36 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
 
-const WeekView = ({ events, dailyGoals, currentDate, onNavigate, setEvents }) => {
-  const startOfWeek = moment(currentDate).startOf('week');
-  const daysOfWeek = [];
-  for (let i = 0; i < 7; i++) {
-    daysOfWeek.push(startOfWeek.clone().add(i, 'days'));
-  }
-
-  const onEventDrop = ({ event, start, end, isAllDay }) => {
-    const updatedEvent = { ...event, start, end, allDay: isAllDay };
-    setEvents((prev) =>
-      prev.map((ev) => (ev.id === event.id ? updatedEvent : ev))
-    );
+const WeekView = ({ events, dailyGoals, currentDate, setEvents, onTaskShiftClick }) => {
+  const onEventDrop = ({ event, start, end, isAllDay: droppedOnAllDaySlot }) => {
+    const updatedEvent = { ...event, start, end, allDay: droppedOnAllDaySlot };
+    setEvents((prev) => prev.map((ev) => (ev.id === event.id ? updatedEvent : ev)));
   };
 
   const onEventResize = ({ event, start, end }) => {
     const updatedEvent = { ...event, start, end };
-    setEvents((prev) =>
-      prev.map((ev) => (ev.id === event.id ? updatedEvent : ev))
-    );
+    setEvents((prev) => prev.map((ev) => (ev.id === event.id ? updatedEvent : ev)));
   };
 
-  const handleSelectSlot = (slotInfo) => {
-    const title = prompt('Enter task title:');
-    if (title) {
-      const newEvent = {
-        id: Date.now(),
-        title,
-        start: slotInfo.start,
-        end: slotInfo.end,
-      };
-      setEvents((prev) => [...prev, newEvent]);
-    }
-  };
-
-  // Custom toolbar (if desired)
-  const customToolbar = (toolbar) => (
-    <div style={{ color: '#fff', marginBottom: '1rem' }}>
-      <button onClick={() => toolbar.onNavigate('PREV')} style={{ marginRight: '1rem' }}>
-        Prev
-      </button>
-      <button onClick={() => toolbar.onNavigate('TODAY')} style={{ marginRight: '1rem' }}>
-        Today
-      </button>
-      <button onClick={() => toolbar.onNavigate('NEXT')} style={{ marginRight: '1rem' }}>
-        Next
-      </button>
-      <span>{toolbar.label}</span>
-    </div>
-  );
-
-  // Force dark backgrounds for every day cell.
-  const dayPropGetter = (date) => {
-    return { style: { backgroundColor: '#1e1e1e', color: '#fff' } };
-  };
+  const dayPropGetter = (date) => ({ style: { backgroundColor: '#1e1e1e', color: '#fff' } });
 
   return (
     <div>
-      {/* Header row with each day’s goal */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          background: '#2e2e2e',
-          padding: '0.5rem',
-          borderRadius: '4px',
-          marginBottom: '1rem',
-        }}
-      >
-        {daysOfWeek.map((day) => {
-          const dayKey = day.format('YYYY-MM-DD');
-          const goal = dailyGoals[dayKey] || 'No goal set';
-          return (
-            <div
-              key={dayKey}
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                background: '#2e2e2e',
-                color: '#fff',
-              }}
-            >
-              <div>{day.format('ddd, MMM D')}</div>
-              <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{goal}</div>
-            </div>
-          );
-        })}
-      </div>
       <DnDCalendar
         localizer={localizer}
         events={events}
         defaultView="week"
         view="week"
-        date={currentDate}
-        onNavigate={onNavigate}
+        date={new Date(currentDate)}
         onEventDrop={onEventDrop}
         onEventResize={onEventResize}
         resizable
         selectable
-        onSelectSlot={handleSelectSlot}
-        components={{
-          toolbar: customToolbar,
+        onSelectEvent={(event, e) => {
+          // Shift-click opens TaskView:
+          if (e.shiftKey) {
+            onTaskShiftClick && onTaskShiftClick(event);
+          }
         }}
         dayPropGetter={dayPropGetter}
         style={{ height: '70vh', backgroundColor: '#1e1e1e', color: '#fff' }}

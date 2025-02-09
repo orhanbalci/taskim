@@ -27,8 +27,8 @@ const modalContentStyle = {
 const panelContainerStyle = {
   display: 'flex',
   flex: 1,
-  marginTop: '1rem',
   gap: '1rem',
+  marginTop: '1rem',
 };
 
 const panelStyle = {
@@ -51,9 +51,18 @@ const inputStyle = {
 };
 
 const TaskView = ({ task, onClose, onUpdateTask }) => {
+  // Use local state so the modal updates immediately.
+  const [subtasks, setSubtasks] = useState(task.subtasks || []);
+  const [comments, setComments] = useState(task.comments || []);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const modalRef = useRef(null);
+
+  // Sync local state when task prop changes.
+  useEffect(() => {
+    setSubtasks(task.subtasks || []);
+    setComments(task.comments || []);
+  }, [task]);
 
   // Close on Escape key.
   useEffect(() => {
@@ -73,17 +82,27 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
 
   const addSubtask = () => {
     if (!subtaskInput.trim()) return;
-    const newSubtask = { id: Date.now(), title: subtaskInput };
-    const updatedTask = { ...task, subtasks: [...(task.subtasks || []), newSubtask] };
-    onUpdateTask(updatedTask);
+    const newSubtask = { id: Date.now(), title: subtaskInput, completed: false };
+    const newSubtasks = [...subtasks, newSubtask];
+    setSubtasks(newSubtasks);
+    onUpdateTask({ ...task, subtasks: newSubtasks, comments });
     setSubtaskInput('');
+  };
+
+  const toggleSubtask = (id) => {
+    const newSubtasks = subtasks.map((st) =>
+      st.id === id ? { ...st, completed: !st.completed } : st
+    );
+    setSubtasks(newSubtasks);
+    onUpdateTask({ ...task, subtasks: newSubtasks, comments });
   };
 
   const addComment = () => {
     if (!commentInput.trim()) return;
     const newComment = { id: Date.now(), text: commentInput };
-    const updatedTask = { ...task, comments: [...(task.comments || []), newComment] };
-    onUpdateTask(updatedTask);
+    const newComments = [...comments, newComment];
+    setComments(newComments);
+    onUpdateTask({ ...task, subtasks, comments: newComments });
     setCommentInput('');
   };
 
@@ -94,10 +113,28 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
         <div style={panelContainerStyle}>
           {/* Subtasks panel */}
           <div style={panelStyle}>
-            {(task.subtasks || []).map((subtask) => (
-              <div key={subtask.id} style={{ display: 'flex', alignItems: 'center', padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-                <span style={{ marginRight: '0.5rem', fontSize: '1.2rem', color: '#fff' }}>○</span>
-                <span style={{ color: '#fff' }}>{subtask.title}</span>
+            {subtasks.map((st) => (
+              <div
+                key={st.id}
+                onClick={() => toggleSubtask(st.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.25rem 0',
+                  borderBottom: '1px solid #333',
+                  cursor: 'pointer',
+                }}
+              >
+                <span
+                  style={{
+                    marginRight: '0.5rem',
+                    fontSize: '1.2rem',
+                    color: st.completed ? 'green' : '#fff',
+                  }}
+                >
+                  {st.completed ? '✔︎' : '○'}
+                </span>
+                <span style={{ color: '#fff' }}>{st.title}</span>
               </div>
             ))}
             <input
@@ -111,9 +148,9 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
           </div>
           {/* Comments panel */}
           <div style={panelStyle}>
-            {(task.comments || []).map((comment) => (
-              <div key={comment.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333', color: '#fff' }}>
-                {comment.text}
+            {comments.map((c) => (
+              <div key={c.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333', color: '#fff' }}>
+                {c.text}
               </div>
             ))}
             <input
