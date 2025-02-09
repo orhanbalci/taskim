@@ -1,32 +1,30 @@
 // src/TaskManagerCalendar.js
 import React, { useState } from 'react';
-import MonthView from './MonthView';
 import WeekView from './WeekView';
 import QuarterView from './QuarterView';
+import CustomMonthView from './CustomMonthView';
 
 const TaskManagerCalendar = () => {
   const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Sample events – each event could have a "completed" property for tracking progress.
+  // Sample events – you can expand these as needed.
   const [events, setEvents] = useState([
     {
       id: 0,
       title: 'Initial Task',
       start: new Date(),
       end: new Date(new Date().getTime() + 60 * 60 * 1000),
-      completed: false,
     },
-    // Add additional sample events as needed.
   ]);
 
-  // Sample weekly goals: keys are in ISO week format "YYYY-ww"
+  // Sample weekly goals – keys are ISO week keys ("YYYY-ww")
   const [weeklyGoals, setWeeklyGoals] = useState({
-    // For example, week 07 of 2025: (adjust the key format as needed)
-    '2025-07': 'Finish project planning',
+    // For example, week 7 of 2025:
+    '2025-07': 'Build this app',
   });
 
-  // Sample daily goals: keys are dates in "YYYY-MM-DD" format
+  // Sample daily goals for week view (not used in the custom month view)
   const [dailyGoals, setDailyGoals] = useState({
     '2025-02-08': 'Call client',
   });
@@ -63,15 +61,14 @@ const TaskManagerCalendar = () => {
             Quarter View
           </button>
         </div>
-        {/* You could add additional navigation (e.g., date controls) here */}
+        {/* Additional navigation (e.g. date controls) could be added here */}
       </header>
       <main style={{ padding: '1rem' }}>
         {currentView === 'month' && (
-          <MonthView
+          <CustomMonthView
             events={events}
             weeklyGoals={weeklyGoals}
             currentDate={currentDate}
-            onNavigate={(date) => setCurrentDate(date)}
             setEvents={setEvents}
           />
         )}
@@ -85,7 +82,11 @@ const TaskManagerCalendar = () => {
           />
         )}
         {currentView === 'quarter' && (
-          <QuarterView events={events} weeklyGoals={weeklyGoals} currentDate={currentDate} />
+          <QuarterView
+            events={events}
+            weeklyGoals={weeklyGoals}
+            currentDate={currentDate}
+          />
         )}
       </main>
     </div>
