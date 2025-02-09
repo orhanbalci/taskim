@@ -13,51 +13,29 @@ const QuarterView = ({ events, weeklyGoals, currentDate }) => {
     weekStart.add(1, 'week');
   }
 
-  // Count tasks in a given week by checking if an event’s start falls within the week.
-  const countTasksInWeek = (weekStart) => {
-    const weekEnd = moment(weekStart).endOf('week');
-    return events.filter((event) => {
-      const eventStart = moment(event.start);
-      return eventStart.isBetween(weekStart, weekEnd, null, '[]');
-    }).length;
-  };
-
   return (
-    <div>
-      <h2 style={{ textAlign: 'center', color: '#fff' }}>
+    <div
+      style={{
+        padding: '1rem',
+        background: '#121212',
+        color: '#fff',
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <h2 style={{ textAlign: 'center' }}>
         Quarter View – {moment(currentDate).format('Q')} Quarter {moment(currentDate).year()}
       </h2>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-        }}
-      >
+      <div>
         {weeks.map((weekStart) => {
           const weekKey = weekStart.format('GGGG-ww');
           const goal = weeklyGoals[weekKey] || 'No goal set';
-          const taskCount = countTasksInWeek(weekStart);
+          const weekEnd = moment(weekStart).endOf('week');
+          const taskCount = events.filter((event) =>
+            moment(event.start).isBetween(weekStart, weekEnd, null, '[]')
+          ).length;
           return (
-            <div
-              key={weekKey}
-              style={{
-                background: '#2e2e2e',
-                padding: '1rem',
-                borderRadius: '4px',
-                color: '#fff',
-              }}
-            >
-              <h3 style={{ margin: '0 0 0.5rem 0' }}>Week {weekStart.format('ww')}</h3>
-              <p style={{ margin: '0.5rem 0' }}>
-                <strong>Goal:</strong> {goal}
-              </p>
-              <p style={{ margin: '0.5rem 0' }}>
-                <strong>Tasks Scheduled:</strong> {taskCount}
-              </p>
-              <p style={{ margin: '0.5rem 0', fontSize: '0.8rem' }}>
-                {weekStart.format('MMM D')} – {moment(weekStart).add(6, 'days').format('MMM D')}
-              </p>
+            <div key={weekKey} style={{ padding: '0.5rem 0', borderBottom: '1px solid #333' }}>
+              <strong>Week {weekStart.isoWeek()}:</strong> {goal} ({taskCount} tasks scheduled)
             </div>
           );
         })}

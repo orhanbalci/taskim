@@ -8,7 +8,6 @@ const TaskManagerCalendar = () => {
   const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Sample events – you can expand these as needed.
   const [events, setEvents] = useState([
     {
       id: 0,
@@ -18,13 +17,12 @@ const TaskManagerCalendar = () => {
     },
   ]);
 
-  // Sample weekly goals – keys are ISO week keys ("YYYY-ww")
+  // Weekly goals keyed by ISO week (e.g., "2025-07")
   const [weeklyGoals, setWeeklyGoals] = useState({
-    // For example, week 7 of 2025:
     '2025-07': 'Build this app',
   });
 
-  // Sample daily goals for week view (not used in the custom month view)
+  // Daily goals for week view
   const [dailyGoals, setDailyGoals] = useState({
     '2025-02-08': 'Call client',
   });
@@ -61,13 +59,13 @@ const TaskManagerCalendar = () => {
             Quarter View
           </button>
         </div>
-        {/* Additional navigation (e.g. date controls) could be added here */}
       </header>
       <main style={{ padding: '1rem' }}>
         {currentView === 'month' && (
           <CustomMonthView
             events={events}
             weeklyGoals={weeklyGoals}
+            setWeeklyGoals={setWeeklyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
           />

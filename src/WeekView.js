@@ -19,29 +19,32 @@ const WeekView = ({ events, dailyGoals, currentDate, onNavigate, setEvents }) =>
 
   const onEventDrop = ({ event, start, end, isAllDay }) => {
     const updatedEvent = { ...event, start, end, allDay: isAllDay };
-    setEvents((prev) => prev.map((ev) => (ev.id === event.id ? updatedEvent : ev)));
+    setEvents((prev) =>
+      prev.map((ev) => (ev.id === event.id ? updatedEvent : ev))
+    );
   };
 
   const onEventResize = ({ event, start, end }) => {
     const updatedEvent = { ...event, start, end };
-    setEvents((prev) => prev.map((ev) => (ev.id === event.id ? updatedEvent : ev)));
+    setEvents((prev) =>
+      prev.map((ev) => (ev.id === event.id ? updatedEvent : ev))
+    );
   };
 
   const handleSelectSlot = (slotInfo) => {
     const title = prompt('Enter task title:');
     if (title) {
       const newEvent = {
-        id: events.length,
+        id: Date.now(),
         title,
         start: slotInfo.start,
         end: slotInfo.end,
-        completed: false,
       };
-      setEvents([...events, newEvent]);
+      setEvents((prev) => [...prev, newEvent]);
     }
   };
 
-  // Custom toolbar (similar to MonthView)
+  // Custom toolbar (if desired)
   const customToolbar = (toolbar) => (
     <div style={{ color: '#fff', marginBottom: '1rem' }}>
       <button onClick={() => toolbar.onNavigate('PREV')} style={{ marginRight: '1rem' }}>
@@ -56,6 +59,11 @@ const WeekView = ({ events, dailyGoals, currentDate, onNavigate, setEvents }) =>
       <span>{toolbar.label}</span>
     </div>
   );
+
+  // Force dark backgrounds for every day cell.
+  const dayPropGetter = (date) => {
+    return { style: { backgroundColor: '#1e1e1e', color: '#fff' } };
+  };
 
   return (
     <div>
@@ -74,7 +82,15 @@ const WeekView = ({ events, dailyGoals, currentDate, onNavigate, setEvents }) =>
           const dayKey = day.format('YYYY-MM-DD');
           const goal = dailyGoals[dayKey] || 'No goal set';
           return (
-            <div key={dayKey} style={{ flex: 1, textAlign: 'center' }}>
+            <div
+              key={dayKey}
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                background: '#2e2e2e',
+                color: '#fff',
+              }}
+            >
               <div>{day.format('ddd, MMM D')}</div>
               <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{goal}</div>
             </div>
@@ -96,6 +112,7 @@ const WeekView = ({ events, dailyGoals, currentDate, onNavigate, setEvents }) =>
         components={{
           toolbar: customToolbar,
         }}
+        dayPropGetter={dayPropGetter}
         style={{ height: '70vh', backgroundColor: '#1e1e1e', color: '#fff' }}
       />
     </div>

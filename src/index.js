@@ -1,17 +1,17 @@
+// src/index.js
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
+import ReactDOM from 'react-dom/client'; // Note the new import for React 18
 import App from './App';
-import reportWebVitals from './reportWebVitals';
+import './index.css';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+// Import DndProvider and the HTML5Backend
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+
+const container = document.getElementById('root');
+const root = ReactDOM.createRoot(container);
 root.render(
-  <React.StrictMode>
+  <DndProvider backend={HTML5Backend}>
     <App />
-  </React.StrictMode>
+  </DndProvider>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
