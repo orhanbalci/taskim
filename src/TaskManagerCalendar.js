@@ -61,46 +61,81 @@ const TaskManagerCalendar = () => {
     setSelectedTask(task);
   };
 
+  const exportData = () => {
+    // Gather all data to export
+    const dataToExport = {
+      events,         // your tasks (with subtasks and comments)
+      weeklyGoals,    // your weekly goals
+      // You could also include dailyGoals if needed:
+      dailyGoals,
+    };
+  
+    // Convert data to a formatted JSON string.
+    const jsonStr = JSON.stringify(dataToExport, null, 2);
+  
+    // Create a Blob from the JSON string.
+    const blob = new Blob([jsonStr], { type: "application/json" });
+  
+    // Create a temporary URL for the Blob.
+    const url = URL.createObjectURL(blob);
+  
+    // Create a temporary anchor element to trigger the download.
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "task-manager-data.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  
+    // Revoke the object URL after a short delay.
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };  
+
   return (
     <div style={{ background: '#121212', color: '#fff', minHeight: '100vh' }}>
-      <header
+    <header
+    style={{
+        background: '#1f1f1f',
+        padding: '1rem',
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    }}
+    >
+    <div>
+        <button onClick={() => navigate('prev')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Prev</button>
+        <button onClick={() => navigate('today')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Today</button>
+        <button onClick={() => navigate('next')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Next</button>
+    </div>
+    <div>
+        <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Month View</button>
+        <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Week View</button>
+        <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Quarter View</button>
+    </div>
+    <div>
+        <input
+        type="text"
+        placeholder="Search..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
         style={{
-          background: '#1f1f1f',
-          padding: '1rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+            padding: '0.5rem',
+            borderRadius: '4px',
+            border: 'none',
+            outline: 'none',
+            background: '#333',
+            color: '#fff',
+            margin: '0.25rem',
         }}
-      >
-        <div>
-          <button onClick={() => navigate('prev')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Prev</button>
-          <button onClick={() => navigate('today')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Today</button>
-          <button onClick={() => navigate('next')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Next</button>
-        </div>
-        <div>
-          <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Month View</button>
-          <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Week View</button>
-          <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Quarter View</button>
-        </div>
-        <div>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: 'none',
-              outline: 'none',
-              background: '#333',
-              color: '#fff',
-              margin: '0.25rem',
-            }}
-          />
-        </div>
-      </header>
+        />
+        {/* New Export Data button */}
+        <button onClick={exportData} style={{ margin: '0.25rem', background: '#555', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+        Export Data
+        </button>
+    </div>
+    </header>
+
       <main style={{ padding: '1rem' }}>
         {currentView === 'month' && (
           <CustomMonthView
