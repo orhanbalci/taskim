@@ -13,7 +13,6 @@ const DraggableTask = ({ event, onShiftClick }) => {
   return (
     <div
       ref={drag}
-      // Retain the shift‑click functionality for opening task details
       onClick={(e) => { if (e.shiftKey) onShiftClick && onShiftClick(event); }}
       style={{
         opacity: isDragging ? 0.5 : 1,
@@ -25,9 +24,10 @@ const DraggableTask = ({ event, onShiftClick }) => {
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis',
         cursor: 'move',
+        color: '#fff'
       }}
     >
-      {event.completed ? <s>{event.title}</s> : event.title}
+      {event.title}
     </div>
   );
 };
