@@ -99,10 +99,18 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
 
   const addComment = () => {
     if (!commentInput.trim()) return;
-    const newComment = { id: Date.now(), text: commentInput };
+    const commentText = commentInput.trim();
+    const newComment = { id: Date.now(), text: commentText };
     const newComments = [...comments, newComment];
-    setComments(newComments);
-    onUpdateTask({ ...task, subtasks, comments: newComments });
+
+    let updatedTask = { ...task, subtasks, comments: newComments };
+    // Check if the comment text is "done" (ignoring case).
+    if (commentText.toLowerCase() === 'done') {
+      updatedTask.completed = true;
+    }
+    
+    setComments(updatedTask.comments);
+    onUpdateTask(updatedTask);
     setCommentInput('');
   };
 
@@ -155,7 +163,7 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
             ))}
             <input
               type="text"
-              placeholder="Add comment"
+              placeholder="Add comment (type 'done' to complete)"
               value={commentInput}
               onChange={(e) => setCommentInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') addComment(); }}
