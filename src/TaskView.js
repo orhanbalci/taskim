@@ -51,21 +51,20 @@ const inputStyle = {
 };
 
 const TaskView = ({ task, onClose, onUpdateTask }) => {
-  // Use local state so the modal updates immediately.
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
   const [comments, setComments] = useState(task.comments || []);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [animateComplete, setAnimateComplete] = useState(false);
+  const [animateUrgent, setAnimateUrgent] = useState(false);
+  const [animateUndo, setAnimateUndo] = useState(false);
   const modalRef = useRef(null);
 
-  // Sync local state when task prop changes.
   useEffect(() => {
     setSubtasks(task.subtasks || []);
     setComments(task.comments || []);
   }, [task]);
 
-  // Close on Escape key.
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -74,7 +73,6 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Close on clicking outside.
   const handleOverlayClick = (e) => {
     if (modalRef.current && !modalRef.current.contains(e.target)) {
       onClose();
@@ -100,17 +98,28 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
 
   const addComment = () => {
     if (!commentInput.trim()) return;
-    const commentText = commentInput.trim();
-    const newComment = { id: Date.now(), text: commentText };
+    const command = commentInput.trim().toLowerCase();
+    const newComment = { id: Date.now(), text: commentInput.trim() };
     const newComments = [...comments, newComment];
-
+    
     let updatedTask = { ...task, subtasks, comments: newComments };
-    // If the comment text equals "done" (ignoring case), mark task complete and trigger animation.
-    if (commentText.toLowerCase() === 'done') {
+
+    if (command === 'done') {
       updatedTask.completed = true;
       setAnimateComplete(true);
-      // Remove animation flag after animation completes.
       setTimeout(() => setAnimateComplete(false), 1000);
+    } else if (command === 'undo') {
+      updatedTask.completed = false;
+      setAnimateUndo(true);
+      setTimeout(() => setAnimateUndo(false), 1000);
+    } else if (command === 'urgent') {
+      updatedTask.urgent = true;
+      setAnimateUrgent(true);
+      setTimeout(() => setAnimateUrgent(false), 1000);
+    } else if (command === 'not urgent') {
+      updatedTask.urgent = false;
+      setAnimateUndo(true);
+      setTimeout(() => setAnimateUndo(false), 1000);
     }
     
     setComments(updatedTask.comments);
@@ -120,7 +129,6 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
 
   return (
     <>
-      {/* Define keyframes for the animation */}
       <style>
         {`
           @keyframes completeFlash {
@@ -128,15 +136,34 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
             50% { background-color: #2e7d32; }
             100% { background-color: #1e1e1e; }
           }
+          @keyframes urgentFlash {
+            0% { background-color: #1e1e1e; }
+            50% { background-color: #b71c1c; }
+            100% { background-color: #1e1e1e; }
+          }
+          @keyframes updateFlash {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+          }
         `}
       </style>
       <div style={modalOverlayStyle} onClick={handleOverlayClick}>
         <div style={modalContentStyle} ref={modalRef}>
-          <h2 style={{ margin: 0, color: '#fff', ...(animateComplete && { animation: 'completeFlash 1s ease-out' }) }}>
+          <h2 
+            style={{ 
+              margin: 0, 
+              color: '#fff',
+              ...(animateComplete && { animation: 'completeFlash 1s ease-out' }),
+              ...(animateUrgent && { animation: 'urgentFlash 1s ease-out' }),
+              ...(animateUndo && { animation: 'updateFlash 1s ease-out' }),
+              // Apply urgent border only if task is urgent and not completed.
+              ...(task.urgent && !task.completed ? { border: '2px solid red', padding: '0.5rem' } : {})
+            }}
+          >
             {task.title}
           </h2>
           <div style={panelContainerStyle}>
-            {/* Subtasks panel */}
             <div style={panelStyle}>
               {subtasks.map((st) => (
                 <div
@@ -172,7 +199,6 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
                 style={inputStyle}
               />
             </div>
-            {/* Comments panel */}
             <div style={panelStyle}>
               {comments.map((c) => (
                 <div key={c.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333', color: '#fff' }}>
@@ -181,7 +207,7 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
               ))}
               <input
                 type="text"
-                placeholder="Add comment (type 'done' to complete)"
+                placeholder="Add comment (type 'done', 'undo', 'urgent', or 'not urgent')"
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addComment(); }}

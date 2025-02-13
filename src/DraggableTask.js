@@ -24,7 +24,8 @@ const DraggableTask = ({ event, onShiftClick }) => {
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis',
         cursor: 'move',
-        color: '#fff'
+        color: '#fff',
+        border: event.completed ? 'none' : (event.urgent ? '2px solid red' : 'none')
       }}
     >
       {event.title}
