@@ -41,6 +41,7 @@ const WeekView = ({ events, dailyGoals, currentDate, setEvents, onTaskShiftClick
         }}
         dayPropGetter={dayPropGetter}
         style={{ height: '70vh', backgroundColor: '#1e1e1e', color: '#fff' }}
+        toolbar={false}
       />
     </div>
   );
