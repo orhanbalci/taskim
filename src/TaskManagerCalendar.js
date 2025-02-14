@@ -123,7 +123,6 @@ const TaskManagerCalendar = () => {
     setCurrentDate(newDate.toDate());
   };
 
-  // Open TaskView when a task is shift-clicked.
   const handleTaskShiftClick = (task) => {
     setSelectedTask(task);
   };
@@ -259,7 +258,13 @@ const TaskManagerCalendar = () => {
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdateTask={(updatedTask) => {
-            setEvents((prev) => prev.map((ev) => (ev.id === updatedTask.id ? updatedTask : ev)));
+            setEvents((prev) =>
+              prev.map((ev) => (ev.id === updatedTask.id ? updatedTask : ev))
+            );
+          }}
+          onDeleteTask={(taskId) => {
+            setEvents((prev) => prev.filter((ev) => ev.id !== taskId));
+            setSelectedTask(null);
           }}
         />
       )}

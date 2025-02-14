@@ -50,7 +50,7 @@ const inputStyle = {
   marginTop: '0.5rem',
 };
 
-const TaskView = ({ task, onClose, onUpdateTask }) => {
+const TaskView = ({ task, onClose, onUpdateTask, onDeleteTask }) => {
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
   const [comments, setComments] = useState(task.comments || []);
   const [subtaskInput, setSubtaskInput] = useState('');
@@ -99,11 +99,18 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
   const addComment = () => {
     if (!commentInput.trim()) return;
     const command = commentInput.trim().toLowerCase();
+  
+    if (command === 'delete') {
+      onDeleteTask(task.id);
+      onClose();
+      return;
+    }
+  
     const newComment = { id: Date.now(), text: commentInput.trim() };
     const newComments = [...comments, newComment];
     
     let updatedTask = { ...task, subtasks, comments: newComments };
-
+  
     if (command === 'done') {
       updatedTask.completed = true;
       setAnimateComplete(true);
@@ -125,7 +132,7 @@ const TaskView = ({ task, onClose, onUpdateTask }) => {
     setComments(updatedTask.comments);
     onUpdateTask(updatedTask);
     setCommentInput('');
-  };
+  };  
 
   return (
     <>

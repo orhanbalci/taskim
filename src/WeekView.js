@@ -35,7 +35,6 @@ const WeekView = ({ events, dailyGoals, currentDate, setEvents, onTaskShiftClick
         resizable
         selectable
         onSelectEvent={(event, e) => {
-          // Shift-click opens TaskView:
           if (e.shiftKey) {
             onTaskShiftClick && onTaskShiftClick(event);
           }
