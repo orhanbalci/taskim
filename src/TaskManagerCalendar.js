@@ -258,12 +258,11 @@ function parseCsvToEvents(csvText) {
           background: '#1f1f1f',
           padding: '1rem',
           display: 'flex',
-          flexWrap: 'wrap',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          flexWrap: 'wrap',
         }}
       >
-        <div>
+        <div style={{ flex: 1, textAlign: 'left' }}>
           <button onClick={() => navigate('prev')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
             Prev
           </button>
@@ -274,7 +273,7 @@ function parseCsvToEvents(csvText) {
             Next
           </button>
         </div>
-        <div>
+        <div style={{ flex: 1, textAlign: 'center' }}>
           <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
             Month View
           </button>
@@ -285,7 +284,7 @@ function parseCsvToEvents(csvText) {
             Quarter View
           </button>
         </div>
-        <div>
+        <div style={{ flex: 1, textAlign: 'right' }}>
           <input
             type="text"
             placeholder="Search..."
