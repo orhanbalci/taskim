@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import PouchDB from 'pouchdb';
-import moment from 'moment';
 import MonthView from './MonthView';
 import WeekView from './WeekView';
 import QuarterView from './QuarterView';
 import TaskView from './TaskView';
 import SearchResults from './SearchResults';
+import moment from 'moment-timezone'; 
 
-// Create (or open) a PouchDB database
 const db = new PouchDB('task_manager_data');
 
-// Helper function to update a document with conflict handling
 async function updateDoc(docId, newData) {
   try {
     const doc = await db.get(docId);
@@ -47,7 +45,6 @@ const TaskManagerCalendar = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState('');
 
-  // Load persistent data from PouchDB on component mount.
   useEffect(() => {
     async function fetchData() {
       // Fetch events document
@@ -67,7 +64,6 @@ const TaskManagerCalendar = () => {
         }
       }
 
-      // Fetch weeklyGoals document
       try {
         const goalsDoc = await db.get('weeklyGoals');
         setWeeklyGoals(goalsDoc.data);
@@ -82,7 +78,6 @@ const TaskManagerCalendar = () => {
     fetchData();
   }, []);
 
-  // Update events in PouchDB when the events state changes.
   useEffect(() => {
     async function updateEvents() {
       try {
@@ -94,7 +89,6 @@ const TaskManagerCalendar = () => {
     updateEvents();
   }, [events]);
 
-  // Update weeklyGoals in PouchDB when weeklyGoals state changes.
   useEffect(() => {
     async function updateWeeklyGoals() {
       try {
@@ -106,7 +100,6 @@ const TaskManagerCalendar = () => {
     updateWeeklyGoals();
   }, [weeklyGoals]);
 
-  // Navigation: adjust the currentDate based on view and direction.
   const navigate = (direction) => {
     let newDate = moment(currentDate);
     if (direction === 'today') {
@@ -133,24 +126,130 @@ const TaskManagerCalendar = () => {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const importedData = JSON.parse(event.target.result);
-        if (importedData.events) {
-          const importedEvents = importedData.events.map((ev) => ({
-            ...ev,
-            start: new Date(ev.start),
-            end: new Date(ev.end),
-          }));
-          setEvents(importedEvents);
-        }
-        if (importedData.weeklyGoals) {
-          setWeeklyGoals(importedData.weeklyGoals);
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          const csvText = event.target.result;
+          const newEvents = parseCsvToEvents(csvText);
+          setEvents((prev) => [...prev, ...newEvents]);
+        } else {
+          const importedData = JSON.parse(event.target.result);
+          if (importedData.events) {
+            const importedEvents = importedData.events.map((ev) => ({
+              ...ev,
+              start: new Date(ev.start),
+              end: new Date(ev.end),
+            }));
+            setEvents(importedEvents);
+          }
+          if (importedData.weeklyGoals) {
+            setWeeklyGoals(importedData.weeklyGoals);
+          }
         }
       } catch (err) {
-        console.error("Error importing data:", err);
+        console.error('Error importing data:', err);
       }
     };
     reader.readAsText(file);
   };
+  
+function stripQuotes(str) {
+  if (str.startsWith('"') && str.endsWith('"')) {
+    return str.slice(1, -1);
+  }
+  return str;
+}
+
+function parseCsvToEvents(csvText) {
+  const importDate = new Date();
+  const todayMidnight = new Date(
+    importDate.getFullYear(),
+    importDate.getMonth(),
+    importDate.getDate()
+  );
+
+  const lines = csvText.split(/\r?\n/).filter((line) => line.trim() !== '');
+  if (lines.length < 2) {
+    console.warn('CSV has no data rows.');
+    return [];
+  }
+
+  const headers = lines[0].split(',');
+  
+  const taskNameIndex = headers.findIndex(
+    (h) => h.trim().toLowerCase() === 'task name'
+  );
+  const taskContentIndex = headers.findIndex(
+    (h) => h.trim().toLowerCase() === 'task content'
+  );
+  const dueDateIndex = headers.findIndex(
+    (h) => h.trim().toLowerCase() === 'due date text'
+  );
+
+  if (taskNameIndex === -1 || taskContentIndex === -1 || dueDateIndex === -1) {
+    console.error(
+      'CSV missing required columns. Needed: "Task Name", "Task Content", "Due Date Text".'
+    );
+    return [];
+  }
+
+  let totalRows = 0;
+  let validRows = 0;
+  const newEvents = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    totalRows++;
+    const row = lines[i].split(',');
+
+    if (row.length <= dueDateIndex) {
+      console.warn('Skipping row with insufficient columns:', row);
+      continue;
+    }
+
+    const rawTitle = row[taskNameIndex].trim();
+    const rawContent = row[taskContentIndex].trim();
+    const rawDueDateText = row[dueDateIndex].trim();
+    const title = stripQuotes(rawTitle);
+    const content = stripQuotes(rawContent);
+    const dueDateStr = stripQuotes(rawDueDateText);
+
+    let parsedMoment;
+    if (/^\d+$/.test(dueDateStr)) {
+      parsedMoment = moment(Number(dueDateStr));
+    } else {
+      parsedMoment = moment.tz(dueDateStr, 'MM/DD/YYYY, hh:mm:ss A z', 'America/Los_Angeles');
+    }
+
+    if (!parsedMoment.isValid()) {
+      console.warn(`Could not parse date: ${dueDateStr}`);
+      continue;
+    }
+
+    const startDate = parsedMoment.toDate();
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    const isComplete = startDate < todayMidnight;
+
+    const newEvent = {
+      id: Date.now() + i,
+      title: title || 'Untitled Task',
+      start: startDate,
+      end: endDate,
+      comments: [
+        {
+          id: Date.now() + i,
+          text: content || '',
+        },
+      ],
+      completed: isComplete,
+    };
+
+    newEvents.push(newEvent);
+    validRows++;
+  }
+
+  const percent = ((validRows / totalRows) * 100).toFixed(1);
+  console.log(`Imported ${validRows} out of ${totalRows} tasks. That's ${percent}% success rate.`);
+  return newEvents;
+} 
 
   return (
     <div style={{ background: '#121212', color: '#fff', minHeight: '100vh' }}>
