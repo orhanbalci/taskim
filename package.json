@@ -5,7 +5,6 @@
   "dependencies": {
     "cra-template": "1.2.0",
     "duckdb": "^1.2.0",
-    "electron": "^34.2.0",
     "moment": "^2.30.1",
     "pouchdb": "^9.0.0",
     "react": "^19.0.0",
@@ -21,7 +20,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "electron-start": "ELECTRON_START_URL=http://localhost:3000 electron .",
+    "electron-build": "npm run build && electron ."
   },
   "eslintConfig": {
     "extends": [
@@ -42,7 +43,7 @@
     ]
   },
   "description": "Simple task app I made to customize to my preferences. Not production ready.",
-  "main": "index.js",
+  "main": "main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RohanAdwankar/task-manager.git"
@@ -53,5 +54,7 @@
   "bugs": {
     "url": "https://github.com/RohanAdwankar/task-manager/issues"
   },
-  "homepage": "https://github.com/RohanAdwankar/task-manager#readme"
+  "devDependencies": {
+    "electron": "^34.2.0"
+  }
 }
