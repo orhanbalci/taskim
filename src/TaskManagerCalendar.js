@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PouchDB from 'pouchdb';
 import moment from 'moment';
-import CustomMonthView from './CustomMonthView';
+import MonthView from './MonthView';
 import WeekView from './WeekView';
 import QuarterView from './QuarterView';
 import TaskView from './TaskView';
@@ -231,7 +231,7 @@ const TaskManagerCalendar = () => {
       </header>
       <main style={{ padding: '1rem' }}>
         {currentView === 'month' && (
-          <CustomMonthView
+          <MonthView
             events={events}
             weeklyGoals={weeklyGoals}
             setWeeklyGoals={setWeeklyGoals}
