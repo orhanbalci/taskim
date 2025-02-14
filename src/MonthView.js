@@ -1,9 +1,59 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import moment from 'moment';
 import { useDrop } from 'react-dnd';
 import DraggableTask from './DraggableTask';
 
-// DayCell renders a single table cell (<td>) for a day.
+const CanvasPrompt = ({ message, onSubmit, onCancel }) => {
+  const [input, setInput] = useState('');
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }, []);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      onSubmit(input);
+    } else if (e.key === 'Escape') {
+      onCancel();
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000 }}>
+      <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }} />
+      <input
+        type="text"
+        autoFocus
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={message}
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(255, 255, 255, 0.2)',
+          color: '#fff',
+          border: 'none',
+          outline: 'none',
+          padding: '1rem',
+          fontSize: '1.2rem',
+          width: '80%',
+        }}
+      />
+    </div>
+  );
+};
+
 const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftClick }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'TASK',
@@ -26,7 +76,7 @@ const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftCli
         background: isOver ? '#3a3a3a' : '#1e1e1e',
         cursor: 'pointer',
       }}
-      onDoubleClick={() => handleAddTask(day)} // Double-click to add a new task.
+      onDoubleClick={() => handleAddTask(day)}
     >
       <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
         {day ? day.format('D') : ''}
@@ -41,6 +91,7 @@ const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftCli
 };
 
 const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents, onTaskShiftClick }) => {
+  const [promptData, setPromptData] = useState(null);
   const startOfMonth = moment(currentDate).startOf('month');
   const endOfMonth = moment(currentDate).endOf('month');
   const startDate = moment(startOfMonth).startOf('week');
@@ -76,8 +127,12 @@ const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents
   };
 
   const handleAddTask = (day) => {
-    const title = prompt(`Enter task title for ${day.format('MMM D, YYYY')}:`);
-    if (title) {
+    setPromptData({ day, message: `Enter task title for ${day.format('MMM D, YYYY')}:` });
+  };
+
+  const submitPrompt = (title) => {
+    if (title && promptData) {
+      const day = promptData.day;
       const newEvent = {
         id: Date.now(),
         title,
@@ -86,14 +141,18 @@ const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents
       };
       setEvents([...events, newEvent]);
     }
-  };
-
-  const updateWeeklyGoal = (weekKey, value) => {
-    setWeeklyGoals((prev) => ({ ...prev, [weekKey]: value }));
+    setPromptData(null);
   };
 
   return (
-    <div style={{ background: '#121212', padding: '1rem', color: '#fff' }}>
+    <div style={{ background: '#121212', padding: '1rem', color: '#fff', position: 'relative' }}>
+      {promptData && (
+        <CanvasPrompt
+          message={promptData.message}
+          onSubmit={submitPrompt}
+          onCancel={() => setPromptData(null)}
+        />
+      )}
       <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>
         {moment(currentDate).format('MMMM YYYY')}
       </h2>
@@ -119,7 +178,7 @@ const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents
                     <input
                       type="text"
                       value={weekGoal}
-                      onChange={(e) => updateWeeklyGoal(weekKey, e.target.value)}
+                      onChange={(e) => setWeeklyGoals((prev) => ({ ...prev, [weekKey]: e.target.value }))}
                       placeholder="Enter goal..."
                       style={{ background: '#444', color: '#fff', border: 'none', outline: 'none', padding: '0.25rem', width: '70%' }}
                     />
