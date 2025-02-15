@@ -1,58 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import moment from 'moment';
 import { useDrop } from 'react-dnd';
 import DraggableTask from './DraggableTask';
-
-const CanvasPrompt = ({ message, onSubmit, onCancel }) => {
-  const [input, setInput] = useState('');
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-  }, []);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      onSubmit(input);
-    } else if (e.key === 'Escape') {
-      onCancel();
-    }
-  };
-
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000 }}>
-      <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }} />
-      <input
-        type="text"
-        autoFocus
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={message}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(255, 255, 255, 0.2)',
-          color: '#fff',
-          border: 'none',
-          outline: 'none',
-          padding: '1rem',
-          fontSize: '1.2rem',
-          width: '80%',
-        }}
-      />
-    </div>
-  );
-};
+import CanvasPrompt from './CanvasPrompt'; // <-- Import the updated CanvasPrompt
 
 const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftClick }) => {
   const [{ isOver }, drop] = useDrop({
@@ -90,8 +40,16 @@ const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftCli
   );
 };
 
-const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents, onTaskShiftClick }) => {
+const MonthView = ({
+  events,
+  weeklyGoals,
+  setWeeklyGoals,
+  currentDate,
+  setEvents,
+  onTaskShiftClick,
+}) => {
   const [promptData, setPromptData] = useState(null);
+
   const startOfMonth = moment(currentDate).startOf('month');
   const endOfMonth = moment(currentDate).endOf('month');
   const startDate = moment(startOfMonth).startOf('week');
@@ -160,7 +118,15 @@ const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents
         <thead>
           <tr>
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName) => (
-              <th key={dayName} style={{ border: '1px solid #333', padding: '0.5rem', background: '#1e1e1e', color: '#fff' }}>
+              <th
+                key={dayName}
+                style={{
+                  border: '1px solid #333',
+                  padding: '0.5rem',
+                  background: '#1e1e1e',
+                  color: '#fff',
+                }}
+              >
                 {dayName}
               </th>
             ))}
@@ -173,20 +139,36 @@ const MonthView = ({ events, weeklyGoals, setWeeklyGoals, currentDate, setEvents
             return (
               <React.Fragment key={`${weekKey}-${wi}`}>
                 <tr>
-                  <td colSpan="7" style={{ background: '#2e2e2e', padding: '0.5rem', border: '1px solid #333' }}>
-                    <span style={{ marginRight: '0.5rem' }}>Week {week[0].isoWeek()} Goal:</span>
+                  <td
+                    colSpan="7"
+                    style={{ background: '#2e2e2e', padding: '0.5rem', border: '1px solid #333' }}
+                  >
+                    <span style={{ marginRight: '0.5rem' }}>
+                      Week {week[0].isoWeek()} Goal:
+                    </span>
                     <input
                       type="text"
                       value={weekGoal}
-                      onChange={(e) => setWeeklyGoals((prev) => ({ ...prev, [weekKey]: e.target.value }))}
+                      onChange={(e) =>
+                        setWeeklyGoals((prev) => ({ ...prev, [weekKey]: e.target.value }))
+                      }
                       placeholder="Enter goal..."
-                      style={{ background: '#444', color: '#fff', border: 'none', outline: 'none', padding: '0.25rem', width: '70%' }}
+                      style={{
+                        background: '#444',
+                        color: '#fff',
+                        border: 'none',
+                        outline: 'none',
+                        padding: '0.25rem',
+                        width: '70%',
+                      }}
                     />
                   </td>
                 </tr>
                 <tr>
                   {week.map((d, di) => {
-                    const dayEvents = events.filter((ev) => moment(ev.start).isSame(d, 'day'));
+                    const dayEvents = events.filter((ev) =>
+                      moment(ev.start).isSame(d, 'day')
+                    );
                     return (
                       <DayCell
                         key={di}
