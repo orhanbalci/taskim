@@ -1,5 +1,5 @@
 {
-  "name": "task-manager-app",
+  "name": "tasks",
   "version": "0.1.0",
   "private": true,
   "homepage": ".",
@@ -48,14 +48,14 @@
       "last 1 safari version"
     ]
   },
-  "description": "Simple task app I made to customize to my preferences. Not production ready.",
+  "description": "Simple task manager.",
   "main": "main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RohanAdwankar/task-manager.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Rohan Adwankar",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/RohanAdwankar/task-manager/issues"

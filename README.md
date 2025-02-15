@@ -12,5 +12,16 @@ I hopped around different task managers so I decided to make my own so that I ca
 - Persistant database even in localhost using PouchDB 
 
 ## Future Plans
-- Refactor to release app through Electron
-- Google calendar integration
+- Refactor to release app through Electron ✅
+
+### Testing
+```
+npm run build
+npx serve -s build
+```
+
+## Building the App
+```
+npm run build
+npm run make
+```
