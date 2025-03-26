@@ -275,13 +275,13 @@ function parseCsvToEvents(csvText) {
         </div>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Month View
+            Month
           </button>
           <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Week View
+            Week
           </button>
           <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Quarter View
+            Quarter
           </button>
         </div>
         <div style={{ flex: 1, textAlign: 'right' }}>
@@ -316,14 +316,14 @@ function parseCsvToEvents(csvText) {
             }}
             style={{ margin: '0.25rem', background: '#555', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
           >
-            Export Data
+            Export
           </button>
           <input type="file" id="importFile" style={{ display: 'none' }} onChange={importData} />
           <button
             onClick={() => document.getElementById('importFile').click()}
             style={{ margin: '0.25rem', background: '#555', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
           >
-            Import Data
+            Import
           </button>
         </div>
       </header>
