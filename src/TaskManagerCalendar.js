@@ -9,6 +9,18 @@ import moment from 'moment-timezone';
 
 const db = new PouchDB('task_manager_data');
 
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 async function updateDoc(docId, newData) {
   try {
     const doc = await db.get(docId);
@@ -41,21 +53,35 @@ const TaskManagerCalendar = () => {
   const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
   const [events, setEvents] = useState([]);
   const [weeklyGoals, setWeeklyGoals] = useState({});
-  const [dailyGoals] = useState({});
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState('');
+  
+  // Create debounced version of updateDoc for weekly goals
+  const debouncedUpdateWeeklyGoals = React.useCallback(
+    debounce((goals) => {
+      updateDoc('weeklyGoals', goals).catch(err => 
+        console.error('Error updating weeklyGoals:', err)
+      );
+    }, 500), // 500ms delay to reduce database writes
+    []
+  );
 
   useEffect(() => {
     async function fetchData() {
       // Fetch events document
       try {
         const eventsDoc = await db.get('events');
-        const parsedEvents = eventsDoc.data.map((ev) => ({
-          ...ev,
-          start: new Date(ev.start),
-          end: new Date(ev.end),
-        }));
-        setEvents(parsedEvents);
+        if (eventsDoc && eventsDoc.data) {
+          const parsedEvents = eventsDoc.data.map((ev) => ({
+            ...ev,
+            start: new Date(ev.start),
+            end: new Date(ev.end),
+          }));
+          setEvents(parsedEvents);
+        } else {
+          console.warn('Events document exists but has no data property');
+          await db.put({ _id: 'events', data: [] });
+        }
       } catch (err) {
         if (err.status === 404) {
           await db.put({ _id: 'events', data: [] });
@@ -64,6 +90,7 @@ const TaskManagerCalendar = () => {
         }
       }
 
+      // Fetch weekly goals with improved error handling
       try {
         const goalsDoc = await db.get('weeklyGoals');
         if (goalsDoc && goalsDoc.data) {
@@ -95,17 +122,10 @@ const TaskManagerCalendar = () => {
     updateEvents();
   }, [events]);
 
+  // Use debounced function for weekly goals updates
   useEffect(() => {
-    async function updateWeeklyGoals() {
-      try {
-        console.log('Saving weekly goals:', weeklyGoals);
-        await updateDoc('weeklyGoals', weeklyGoals);
-      } catch (err) {
-        console.error('Error updating weeklyGoals:', err);
-      }
-    }
-    updateWeeklyGoals();
-  }, [weeklyGoals]);
+    debouncedUpdateWeeklyGoals(weeklyGoals);
+  }, [weeklyGoals, debouncedUpdateWeeklyGoals]);
 
   const navigate = (direction) => {
     let newDate = moment(currentDate);
@@ -309,7 +329,7 @@ function parseCsvToEvents(csvText) {
           />
           <button
             onClick={() => {
-              const dataToExport = { events, weeklyGoals, dailyGoals };
+              const dataToExport = { events, weeklyGoals };
               const jsonStr = JSON.stringify(dataToExport, null, 2);
               const blob = new Blob([jsonStr], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
@@ -348,7 +368,6 @@ function parseCsvToEvents(csvText) {
         {currentView === 'week' && (
           <WeekView
             events={events}
-            dailyGoals={dailyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
             onTaskShiftClick={handleTaskShiftClick}

@@ -102,6 +102,11 @@ const MonthView = ({
     setPromptData(null);
   };
 
+  // Create a memoized weekly goal update function to improve performance
+  const updateWeeklyGoal = React.useCallback((weekKey, value) => {
+    setWeeklyGoals(prev => ({ ...prev, [weekKey]: value }));
+  }, [setWeeklyGoals]);
+
   return (
     <div style={{ background: '#121212', padding: '1rem', color: '#fff', position: 'relative' }}>
       {promptData && (
@@ -146,9 +151,7 @@ const MonthView = ({
                     <input
                       type="text"
                       value={weekGoal}
-                      onChange={(e) =>
-                        setWeeklyGoals((prev) => ({ ...prev, [weekKey]: e.target.value }))
-                      }
+                      onChange={(e) => updateWeeklyGoal(weekKey, e.target.value)}
                       placeholder=""
                       style={{
                         background: 'transparent',

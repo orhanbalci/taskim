@@ -9,7 +9,7 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
 
-const WeekView = ({ events, dailyGoals, currentDate, setEvents, onTaskShiftClick }) => {
+const WeekView = ({ events, currentDate, setEvents, onTaskShiftClick }) => {
   const onEventDrop = ({ event, start, end, isAllDay: droppedOnAllDaySlot }) => {
     const updatedEvent = { ...event, start, end, allDay: droppedOnAllDaySlot };
     setEvents((prev) => prev.map((ev) => (ev.id === event.id ? updatedEvent : ev)));
