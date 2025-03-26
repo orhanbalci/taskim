@@ -66,9 +66,15 @@ const TaskManagerCalendar = () => {
 
       try {
         const goalsDoc = await db.get('weeklyGoals');
-        setWeeklyGoals(goalsDoc.data);
+        if (goalsDoc && goalsDoc.data) {
+          setWeeklyGoals(goalsDoc.data);
+        } else {
+          console.warn('Weekly goals document exists but has no data property');
+          await db.put({ _id: 'weeklyGoals', data: {} });
+        }
       } catch (err) {
         if (err.status === 404) {
+          console.log('Creating new weekly goals document');
           await db.put({ _id: 'weeklyGoals', data: {} });
         } else {
           console.error('Error fetching weeklyGoals:', err);
@@ -92,6 +98,7 @@ const TaskManagerCalendar = () => {
   useEffect(() => {
     async function updateWeeklyGoals() {
       try {
+        console.log('Saving weekly goals:', weeklyGoals);
         await updateDoc('weeklyGoals', weeklyGoals);
       } catch (err) {
         console.error('Error updating weeklyGoals:', err);
