@@ -143,23 +143,29 @@ const MonthView = ({
                     colSpan="7"
                     style={{ background: '#2e2e2e', padding: '0.5rem', border: '1px solid #333' }}
                   >
-                    <span style={{ marginRight: '0.5rem' }}>
-                      Week {week[0].isoWeek()} Goal:
-                    </span>
                     <input
                       type="text"
                       value={weekGoal}
                       onChange={(e) =>
                         setWeeklyGoals((prev) => ({ ...prev, [weekKey]: e.target.value }))
                       }
-                      placeholder="Enter goal..."
+                      placeholder=""
                       style={{
-                        background: '#444',
+                        background: 'transparent',
                         color: '#fff',
                         border: 'none',
                         outline: 'none',
                         padding: '0.25rem',
-                        width: '70%',
+                        width: '100%',
+                        opacity: weekGoal ? '1' : '0.3',
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.opacity = '1';
+                        e.target.style.background = '#444';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.background = 'transparent';
+                        e.target.style.opacity = e.target.value ? '1' : '0.3';
                       }}
                     />
                   </td>
