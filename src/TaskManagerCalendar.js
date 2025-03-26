@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PouchDB from 'pouchdb';
 import MonthView from './MonthView';
 import WeekView from './WeekView';
-import QuarterView from './QuarterView';
+import YearView from './YearView';
 import TaskView from './TaskView';
 import SearchResults from './SearchResults';
 import moment from 'moment-timezone'; 
@@ -50,7 +50,7 @@ async function updateDoc(docId, newData) {
 
 const TaskManagerCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
+  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "year"
   const [events, setEvents] = useState([]);
   const [weeklyGoals, setWeeklyGoals] = useState({});
   const [selectedTask, setSelectedTask] = useState(null);
@@ -136,8 +136,8 @@ const TaskManagerCalendar = () => {
         newDate = direction === 'prev' ? newDate.subtract(1, 'month') : newDate.add(1, 'month');
       } else if (currentView === 'week') {
         newDate = direction === 'prev' ? newDate.subtract(1, 'week') : newDate.add(1, 'week');
-      } else if (currentView === 'quarter') {
-        newDate = direction === 'prev' ? newDate.subtract(3, 'month') : newDate.add(3, 'month');
+      } else if (currentView === 'year') {
+        newDate = direction === 'prev' ? newDate.subtract(1, 'year') : newDate.add(1, 'year');
       }
     }
     setCurrentDate(newDate.toDate());
@@ -307,8 +307,8 @@ function parseCsvToEvents(csvText) {
           <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
             Week
           </button>
-          <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Quarter
+          <button onClick={() => setCurrentView('year')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+            Year
           </button>
         </div>
         <div style={{ flex: 1, textAlign: 'right' }}>
@@ -373,8 +373,8 @@ function parseCsvToEvents(csvText) {
             onTaskShiftClick={handleTaskShiftClick}
           />
         )}
-        {currentView === 'quarter' && (
-          <QuarterView events={events} weeklyGoals={weeklyGoals} currentDate={currentDate} />
+        {currentView === 'year' && (
+          <YearView events={events} currentDate={currentDate} />
         )}
       </main>
       {selectedTask && (
