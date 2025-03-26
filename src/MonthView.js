@@ -1,8 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import moment from 'moment';
 import { useDrop } from 'react-dnd';
 import DraggableTask from './DraggableTask';
-import CanvasPrompt from './CanvasPrompt'; // <-- Import the updated CanvasPrompt
+import CanvasPrompt from './CanvasPrompt';
+
+// New dedicated component for weekly goal input with local state management
+const WeeklyGoalInput = React.memo(({ weekKey, initialValue, onUpdate }) => {
+  const [localValue, setLocalValue] = useState(initialValue || '');
+  
+  // Update local state without triggering parent updates
+  const handleChange = (e) => {
+    setLocalValue(e.target.value);
+  };
+  
+  // Only update parent state when user finishes typing
+  const handleBlur = () => {
+    // Only trigger update if value actually changed
+    if (localValue !== initialValue) {
+      onUpdate(weekKey, localValue);
+    }
+  };
+  
+  // If prop changes from outside, update local state
+  React.useEffect(() => {
+    setLocalValue(initialValue || '');
+  }, [initialValue]);
+  
+  return (
+    <input
+      type="text"
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder=""
+      style={{
+        background: 'transparent',
+        color: '#fff',
+        border: 'none',
+        outline: 'none',
+        padding: '0.25rem',
+        width: '100%',
+        opacity: localValue ? '1' : '0.3',
+      }}
+      onFocus={(e) => {
+        e.target.style.opacity = '1';
+        e.target.style.background = '#444';
+      }}
+      onBlur={(e) => {
+        e.target.style.background = 'transparent';
+        e.target.style.opacity = e.target.value ? '1' : '0.3';
+        handleBlur();
+      }}
+    />
+  );
+});
 
 const DayCell = ({ day, dayEvents, updateTaskDate, handleAddTask, onTaskShiftClick }) => {
   const [{ isOver }, drop] = useDrop({
@@ -102,13 +153,13 @@ const MonthView = ({
     setPromptData(null);
   };
 
-  // Create a memoized weekly goal update function to improve performance
-  const updateWeeklyGoal = React.useCallback((weekKey, value) => {
+  // Memoized callback for updating weekly goals
+  const updateWeeklyGoal = useCallback((weekKey, value) => {
     setWeeklyGoals(prev => ({ ...prev, [weekKey]: value }));
   }, [setWeeklyGoals]);
 
   return (
-    <div style={{ background: '#121212', padding: '1rem', color: '#fff', position: 'relative' }}>
+    <div style={{ background: '#121212', padding: '0rem', color: '#fff', position: 'relative' }}>
       {promptData && (
         <CanvasPrompt
           message={promptData.message}
@@ -148,28 +199,10 @@ const MonthView = ({
                     colSpan="7"
                     style={{ background: '#2e2e2e', padding: '0.5rem', border: '1px solid #333' }}
                   >
-                    <input
-                      type="text"
-                      value={weekGoal}
-                      onChange={(e) => updateWeeklyGoal(weekKey, e.target.value)}
-                      placeholder=""
-                      style={{
-                        background: 'transparent',
-                        color: '#fff',
-                        border: 'none',
-                        outline: 'none',
-                        padding: '0.25rem',
-                        width: '100%',
-                        opacity: weekGoal ? '1' : '0.3',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.opacity = '1';
-                        e.target.style.background = '#444';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.background = 'transparent';
-                        e.target.style.opacity = e.target.value ? '1' : '0.3';
-                      }}
+                    <WeeklyGoalInput 
+                      weekKey={weekKey}
+                      initialValue={weekGoal}
+                      onUpdate={updateWeeklyGoal}
                     />
                   </td>
                 </tr>
