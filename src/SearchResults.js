@@ -1,4 +1,5 @@
 import React from 'react';
+import moment from 'moment';
 
 const modalOverlayStyle = {
   position: 'fixed',
@@ -23,7 +24,7 @@ const modalContentStyle = {
   overflowY: 'auto',
 };
 
-const SearchResults = ({ searchText, events, weeklyGoals, onClose, onTaskDoubleClick }) => {
+const SearchResults = ({ searchText, events, weeklyGoals, onClose, onTaskShiftClick }) => {
   // Simple fuzzy search using case-insensitive substring matching.
   const lowerSearch = searchText.toLowerCase();
 
@@ -53,10 +54,23 @@ const SearchResults = ({ searchText, events, weeklyGoals, onClose, onTaskDoubleC
           matchingTasks.map((task) => (
             <div
               key={task.id}
-              onDoubleClick={() => onTaskDoubleClick(task)}
-              style={{ padding: '0.5rem', borderBottom: '1px solid #333', cursor: 'pointer' }}
+              onClick={() => onTaskShiftClick(task)}
+              style={{ 
+                padding: '0.5rem', 
+                borderBottom: '1px solid #333', 
+                cursor: 'pointer',
+                background: '#2a2a2a',
+                borderRadius: '4px',
+                margin: '4px 0',
+                transition: 'background 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = '#3a3a3a'}
+              onMouseOut={(e) => e.currentTarget.style.background = '#2a2a2a'}
             >
               {task.title}
+              <div style={{ fontSize: '0.8em', color: '#aaa', marginTop: '4px' }}>
+                {moment(task.start).format('MMM D, YYYY')}
+              </div>
             </div>
           ))
         )}
