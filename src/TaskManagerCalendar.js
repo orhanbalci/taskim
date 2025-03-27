@@ -374,7 +374,11 @@ function parseCsvToEvents(csvText) {
           />
         )}
         {currentView === 'year' && (
-          <YearView events={events} currentDate={currentDate} />
+          <YearView 
+            events={events} 
+            currentDate={currentDate} 
+            weeklyGoals={weeklyGoals}
+          />
         )}
       </main>
       {selectedTask && (
