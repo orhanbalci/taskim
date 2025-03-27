@@ -2,12 +2,24 @@ import React, { useState, useEffect } from 'react';
 import PouchDB from 'pouchdb';
 import MonthView from './MonthView';
 import WeekView from './WeekView';
-import QuarterView from './QuarterView';
+import YearView from './YearView';
 import TaskView from './TaskView';
 import SearchResults from './SearchResults';
 import moment from 'moment-timezone'; 
 
 const db = new PouchDB('task_manager_data');
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 async function updateDoc(docId, newData) {
   try {
@@ -38,24 +50,38 @@ async function updateDoc(docId, newData) {
 
 const TaskManagerCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "quarter"
+  const [currentView, setCurrentView] = useState('month'); // "month", "week", or "year"
   const [events, setEvents] = useState([]);
   const [weeklyGoals, setWeeklyGoals] = useState({});
-  const [dailyGoals] = useState({});
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState('');
+  
+  // Create debounced version of updateDoc for weekly goals
+  const debouncedUpdateWeeklyGoals = React.useCallback(
+    debounce((goals) => {
+      updateDoc('weeklyGoals', goals).catch(err => 
+        console.error('Error updating weeklyGoals:', err)
+      );
+    }, 500), // 500ms delay to reduce database writes
+    []
+  );
 
   useEffect(() => {
     async function fetchData() {
       // Fetch events document
       try {
         const eventsDoc = await db.get('events');
-        const parsedEvents = eventsDoc.data.map((ev) => ({
-          ...ev,
-          start: new Date(ev.start),
-          end: new Date(ev.end),
-        }));
-        setEvents(parsedEvents);
+        if (eventsDoc && eventsDoc.data) {
+          const parsedEvents = eventsDoc.data.map((ev) => ({
+            ...ev,
+            start: new Date(ev.start),
+            end: new Date(ev.end),
+          }));
+          setEvents(parsedEvents);
+        } else {
+          console.warn('Events document exists but has no data property');
+          await db.put({ _id: 'events', data: [] });
+        }
       } catch (err) {
         if (err.status === 404) {
           await db.put({ _id: 'events', data: [] });
@@ -64,11 +90,18 @@ const TaskManagerCalendar = () => {
         }
       }
 
+      // Fetch weekly goals with improved error handling
       try {
         const goalsDoc = await db.get('weeklyGoals');
-        setWeeklyGoals(goalsDoc.data);
+        if (goalsDoc && goalsDoc.data) {
+          setWeeklyGoals(goalsDoc.data);
+        } else {
+          console.warn('Weekly goals document exists but has no data property');
+          await db.put({ _id: 'weeklyGoals', data: {} });
+        }
       } catch (err) {
         if (err.status === 404) {
+          console.log('Creating new weekly goals document');
           await db.put({ _id: 'weeklyGoals', data: {} });
         } else {
           console.error('Error fetching weeklyGoals:', err);
@@ -89,16 +122,10 @@ const TaskManagerCalendar = () => {
     updateEvents();
   }, [events]);
 
+  // Use debounced function for weekly goals updates
   useEffect(() => {
-    async function updateWeeklyGoals() {
-      try {
-        await updateDoc('weeklyGoals', weeklyGoals);
-      } catch (err) {
-        console.error('Error updating weeklyGoals:', err);
-      }
-    }
-    updateWeeklyGoals();
-  }, [weeklyGoals]);
+    debouncedUpdateWeeklyGoals(weeklyGoals);
+  }, [weeklyGoals, debouncedUpdateWeeklyGoals]);
 
   const navigate = (direction) => {
     let newDate = moment(currentDate);
@@ -109,8 +136,8 @@ const TaskManagerCalendar = () => {
         newDate = direction === 'prev' ? newDate.subtract(1, 'month') : newDate.add(1, 'month');
       } else if (currentView === 'week') {
         newDate = direction === 'prev' ? newDate.subtract(1, 'week') : newDate.add(1, 'week');
-      } else if (currentView === 'quarter') {
-        newDate = direction === 'prev' ? newDate.subtract(3, 'month') : newDate.add(3, 'month');
+      } else if (currentView === 'year') {
+        newDate = direction === 'prev' ? newDate.subtract(1, 'year') : newDate.add(1, 'year');
       }
     }
     setCurrentDate(newDate.toDate());
@@ -275,13 +302,13 @@ function parseCsvToEvents(csvText) {
         </div>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <button onClick={() => setCurrentView('month')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Month View
+            Month
           </button>
           <button onClick={() => setCurrentView('week')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Week View
+            Week
           </button>
-          <button onClick={() => setCurrentView('quarter')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-            Quarter View
+          <button onClick={() => setCurrentView('year')} style={{ margin: '0.25rem', background: '#333', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+            Year
           </button>
         </div>
         <div style={{ flex: 1, textAlign: 'right' }}>
@@ -302,7 +329,7 @@ function parseCsvToEvents(csvText) {
           />
           <button
             onClick={() => {
-              const dataToExport = { events, weeklyGoals, dailyGoals };
+              const dataToExport = { events, weeklyGoals };
               const jsonStr = JSON.stringify(dataToExport, null, 2);
               const blob = new Blob([jsonStr], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
@@ -316,14 +343,14 @@ function parseCsvToEvents(csvText) {
             }}
             style={{ margin: '0.25rem', background: '#555', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
           >
-            Export Data
+            Export
           </button>
           <input type="file" id="importFile" style={{ display: 'none' }} onChange={importData} />
           <button
             onClick={() => document.getElementById('importFile').click()}
             style={{ margin: '0.25rem', background: '#555', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
           >
-            Import Data
+            Import
           </button>
         </div>
       </header>
@@ -341,14 +368,17 @@ function parseCsvToEvents(csvText) {
         {currentView === 'week' && (
           <WeekView
             events={events}
-            dailyGoals={dailyGoals}
             currentDate={currentDate}
             setEvents={setEvents}
             onTaskShiftClick={handleTaskShiftClick}
           />
         )}
-        {currentView === 'quarter' && (
-          <QuarterView events={events} weeklyGoals={weeklyGoals} currentDate={currentDate} />
+        {currentView === 'year' && (
+          <YearView 
+            events={events} 
+            currentDate={currentDate} 
+            weeklyGoals={weeklyGoals}
+          />
         )}
       </main>
       {selectedTask && (
