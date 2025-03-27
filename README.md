@@ -9,10 +9,10 @@ I hopped around different task managers so I decided to make my own so that I ca
 - Create, complete, prioritize, delete, comment on, and add subtasks to tasks.
 - Drag and Drop interface for both Month and Week views
 - Search tasks and goals
-- Persistant database even in localhost using PouchDB 
+- Persistant database even in localhost using PouchDB
+- Github style Year View
+<img width="1020" alt="image" src="https://github.com/user-attachments/assets/6932e4ec-99b1-48cd-ac32-da7009d61d9a" />
 
-## Future Plans
-- Refactor to release app through Electron ✅
 
 ### Testing
 ```
