@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import moment from 'moment';
 
 const YearView = ({ events, currentDate, weeklyGoals }) => {
   const year = moment(currentDate).year();
   const [hoveredTasks, setHoveredTasks] = useState(null);
+  const tableContainerRef = useRef(null);
+  const currentWeekRowRef = useRef(null);
   
   // Generate all days for the year
   const yearData = useMemo(() => {
@@ -183,6 +185,17 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
     return positions;
   }, [weeks, year]);
 
+  // Auto-scroll to current week after render
+  useEffect(() => {
+    if (tableContainerRef.current && currentWeekRowRef.current) {
+      // Scroll to current week with a small offset to show a bit of context above
+      currentWeekRowRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, []);
+
   return (
     <div style={{
       padding: '1rem',
@@ -201,7 +214,7 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
             key={monthData.label} 
             style={{ 
               position: 'absolute',
-              left: `${monthData.weekIndex * 20}px`, // 16px = cell width (14px) + margin (2px)
+              left: `${monthData.weekIndex * 16}px`,
               textAlign: 'center',
               fontWeight: moment(currentDate).month() === monthData.month ? 'bold' : 'normal',
               fontSize: '12px',
@@ -232,13 +245,12 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
                 return (
                   <div 
                     key={dateKey}
-                    onMouseEnter={() => taskCount > 0 && setHoveredTasks({ 
+                    onMouseEnter={(e) => taskCount > 0 && setHoveredTasks({ 
                       date: dateKey, 
                       tasks: tasksForDay,
-                      position: { x: window.event.clientX, y: window.event.clientY }
+                      position: { x: e.clientX, y: e.clientY }
                     })}
                     onMouseLeave={() => setHoveredTasks(null)}
-                    title={`${day.date.format('YYYY-MM-DD')}: ${taskCount} completed tasks`}
                     style={{
                       width: '14px',
                       height: '14px',
@@ -250,6 +262,7 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
                       borderRadius: '2px',
                       opacity: day.isCurrentYear ? 1 : 0.3,
                       position: 'relative',
+                      cursor: taskCount > 0 ? 'pointer' : 'default'
                     }}
                   />
                 );
@@ -313,14 +326,17 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
       {/* Weekly summary table */}
       <div style={{ marginTop: '2rem' }}>
         <h3 style={{ marginBottom: '1rem' }}>Weekly Summary</h3>
-        <div style={{
-          maxHeight: '300px',
-          overflowY: 'auto',
-          border: '1px solid #333',
-          borderRadius: '4px'
-        }}>
+        <div 
+          ref={tableContainerRef}
+          style={{
+            maxHeight: '300px',
+            overflowY: 'auto',
+            border: '1px solid #333',
+            borderRadius: '4px'
+          }}
+        >
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#1e1e1e' }}>
+            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#1e1e1e', zIndex: 1 }}>
               <tr>
                 <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #333' }}>Week</th>
                 <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #333' }}>Dates</th>
@@ -330,9 +346,13 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
             </thead>
             <tbody>
               {weeklySummary.map(week => (
-                <tr key={week.weekKey} style={{ 
-                  backgroundColor: week.isCurrentWeek ? '#2a3225' : 'transparent' 
-                }}>
+                <tr 
+                  key={week.weekKey} 
+                  ref={week.isCurrentWeek ? currentWeekRowRef : null}
+                  style={{ 
+                    backgroundColor: week.isCurrentWeek ? '#2a3225' : 'transparent' 
+                  }}
+                >
                   <td style={{ padding: '8px', borderBottom: '1px solid #333' }}>
                     {week.weekNumber}
                   </td>
