@@ -13,8 +13,12 @@ const WeeklyGoalInput = React.memo(({ weekKey, initialValue, onUpdate }) => {
     setLocalValue(e.target.value);
   };
   
-  // Only update parent state when user finishes typing
-  const handleBlur = () => {
+  // Combined onBlur handler with visual styling and parent notification
+  const handleBlur = (e) => {
+    // Update visual styling
+    e.target.style.background = 'transparent';
+    e.target.style.opacity = e.target.value ? '1' : '0.3';
+    
     // Only trigger update if value actually changed
     if (localValue !== initialValue) {
       onUpdate(weekKey, localValue);
@@ -45,11 +49,6 @@ const WeeklyGoalInput = React.memo(({ weekKey, initialValue, onUpdate }) => {
       onFocus={(e) => {
         e.target.style.opacity = '1';
         e.target.style.background = '#444';
-      }}
-      onBlur={(e) => {
-        e.target.style.background = 'transparent';
-        e.target.style.opacity = e.target.value ? '1' : '0.3';
-        handleBlur();
       }}
     />
   );
