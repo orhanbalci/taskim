@@ -295,55 +295,111 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
         {year} Activity
       </h2>
       
-      {/* Month labels section */}
-      <div style={{ display: 'flex', marginBottom: '0', marginLeft: '2rem', position: 'relative', height: '25px' }}>
-        {monthPositions.map((monthData) => (
-          <div 
-            key={monthData.label} 
-            style={{ 
-              position: 'absolute',
-              left: `${monthData.weekIndex * 16}px`,
-              textAlign: 'center',
-              fontWeight: moment(currentDate).month() === monthData.month ? 'bold' : 'normal',
-              fontSize: '12px',
-            }}
-          >
-            {monthData.label}
+      {/* Content container with consistent width for both sections */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Activity graph section with full width */}
+        <div style={{ width: '100%', marginBottom: '2rem' }}>
+          {/* Month labels section - adjusted positioning */}
+          <div style={{ 
+            display: 'flex', 
+            marginBottom: '0', 
+            marginLeft: '2rem', 
+            position: 'relative', 
+            height: '25px',
+            width: 'calc(100% - 2.5rem)' // Account for left label margin
+          }}>
+            {monthPositions.map((monthData, index) => {
+              // Calculate position based on month index for more even distribution
+              const position = (monthData.weekIndex / (weeks.length - 1)) * 100;
+              return (
+                <div 
+                  key={monthData.label} 
+                  style={{ 
+                    position: 'absolute',
+                    left: `${position}%`,
+                    transform: 'translateX(-50%)', // Center the label
+                    textAlign: 'center',
+                    fontWeight: moment(currentDate).month() === monthData.month ? 'bold' : 'normal',
+                    fontSize: '12px',
+                  }}
+                >
+                  {monthData.label}
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
-      
-      {/* Activity grid */}
-      <div style={{ display: 'flex' }}>
-        {/* Day of week labels */}
-        <div style={{ marginRight: '0.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-around' }}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} style={{ height: '14px', fontSize: '10px', textAlign: 'right' }}>{day}</div>
-          ))}
+          
+          {/* Activity grid - expanded to full width */}
+          <div style={{ display: 'flex' }}>
+            {/* Day of week labels */}
+            <div style={{ marginRight: '0.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-around' }}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} style={{ height: '14px', fontSize: '10px', textAlign: 'right' }}>{day}</div>
+              ))}
+            </div>
+            
+            {/* Calendar grid with improved width distribution */}
+            <div style={{ 
+              display: 'flex', 
+              flexWrap: 'nowrap', 
+              overflowX: 'auto',
+              width: 'calc(100% - 2.5rem)', // Take up remaining space
+              justifyContent: 'space-between' // Distribute space evenly
+            }}>
+              {weeks.map((week, weekIndex) => (
+                <div key={weekIndex} style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  margin: '0 1px',
+                  // Allow cells to grow proportionally
+                  flex: '1 0 auto'
+                }}>
+                  {week.map((day) => {
+                    const dateKey = day.date.format('YYYY-MM-DD');
+                    const tasksForDay = completedTasksByDay[dateKey] || [];
+                    const taskCount = tasksForDay.length;
+                    
+                    return (
+                      <ActivityCell 
+                        key={dateKey}
+                        day={day}
+                        taskCount={taskCount}
+                        tasksForDay={tasksForDay}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Legend */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1.5rem', gap: '0.5rem' }}>
+            <span>Less</span>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'transparent', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 100, 0, 0.2)', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 130, 0, 0.4)', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 160, 0, 0.6)', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 190, 0, 0.8)', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 230, 0, 1.0)', border: '1px solid #333', borderRadius: '2px' }}></div>
+            <span>More</span>
+          </div>
+          
+          <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem', color: '#aaa' }}>
+            {Object.values(completedTasksByDay).flat().filter(event => moment(event.start).year() === year).length} tasks completed in {year}
+          </div>
         </div>
         
-        {/* Calendar grid with optimized rendering */}
-        <div style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto' }}>
-          {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', margin: '0 1px' }}>
-              {week.map((day) => {
-                const dateKey = day.date.format('YYYY-MM-DD');
-                const tasksForDay = completedTasksByDay[dateKey] || [];
-                const taskCount = tasksForDay.length;
-                
-                return (
-                  <ActivityCell 
-                    key={dateKey}
-                    day={day}
-                    taskCount={taskCount}
-                    tasksForDay={tasksForDay}
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
-                  />
-                );
-              })}
-            </div>
-          ))}
+        {/* Weekly summary section - same width as activity graph */}
+        <div style={{ width: '100%' }}>
+          <h3 style={{ marginBottom: '1rem' }}>Weekly Summary</h3>
+          <WeeklySummaryTable 
+            weeklySummary={weeklySummary}
+            tableContainerRef={tableContainerRef}
+            currentWeekRowRef={currentWeekRowRef}
+          />
         </div>
       </div>
       
@@ -381,32 +437,6 @@ const YearView = ({ events, currentDate, weeklyGoals }) => {
           </div>
         </div>
       )}
-      
-      {/* Legend */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1.5rem', gap: '0.5rem' }}>
-        <span>Less</span>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'transparent', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 100, 0, 0.2)', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 130, 0, 0.4)', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 160, 0, 0.6)', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 190, 0, 0.8)', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <div style={{ width: '14px', height: '14px', backgroundColor: 'rgba(0, 230, 0, 1.0)', border: '1px solid #333', borderRadius: '2px' }}></div>
-        <span>More</span>
-      </div>
-      
-      <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem', color: '#aaa' }}>
-        {Object.values(completedTasksByDay).flat().filter(event => moment(event.start).year() === year).length} tasks completed in {year}
-      </div>
-      
-      {/* Weekly summary section using memoized component */}
-      <div style={{ marginTop: '2rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Weekly Summary</h3>
-        <WeeklySummaryTable 
-          weeklySummary={weeklySummary}
-          tableContainerRef={tableContainerRef}
-          currentWeekRowRef={currentWeekRowRef}
-        />
-      </div>
     </div>
   );
 };
