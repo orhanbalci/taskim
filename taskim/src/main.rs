@@ -77,8 +77,35 @@ impl App {
             AppMode::ConfirmDelete(task_id) => {
                 match key.code {
                     KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        // Store the date before deletion for cursor restoration
+                        let task_date = self.data.events.iter()
+                            .find(|t| &t.id == task_id)
+                            .map(|t| t.start.date_naive());
+                        
                         // Delete the task
                         self.data.events.retain(|t| &t.id != task_id);
+                        
+                        // Check if there are any remaining tasks on the same date
+                        if let Some(date) = task_date {
+                            let remaining_tasks: Vec<_> = self.data.events.iter()
+                                .filter(|t| t.is_on_date(date))
+                                .collect();
+                            
+                            if remaining_tasks.is_empty() {
+                                // No more tasks on this day, select the day itself
+                                self.month_view.selection = month_view::Selection {
+                                    selection_type: month_view::SelectionType::Day(date),
+                                    task_index_in_day: None,
+                                };
+                            } else {
+                                // Select the first remaining task
+                                self.month_view.selection = month_view::Selection {
+                                    selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
+                                    task_index_in_day: Some(0),
+                                };
+                            }
+                        }
+                        
                         self.mode = AppMode::Normal;
                         self.save()?;
                     }

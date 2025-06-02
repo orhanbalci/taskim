@@ -3,7 +3,6 @@ use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -134,21 +133,43 @@ impl MonthView {
     pub fn move_up(&mut self, tasks: &[Task]) {
         match &self.selection.selection_type {
             SelectionType::Day(date) => {
-                // Move to the same day of the previous week
-                if let Some(new_date) = date.checked_sub_signed(chrono::Duration::weeks(1)) {
-                    self.selection = Selection {
-                        selection_type: SelectionType::Day(new_date),
-                        task_index_in_day: None,
-                    };
+                let current_date = *date;
+                // Check if moving up a week would go outside current month
+                if let Some(new_date) = current_date.checked_sub_signed(chrono::Duration::weeks(1)) {
+                    if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                        // Go to previous month
+                        let target_day = current_date.day();
+                        self.prev_month();
+                        // Try to find a similar date in the new month
+                        let days_in_month = match self.current_date.month() {
+                            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                            4 | 6 | 9 | 11 => 30,
+                            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
+                            _ => 31,
+                        };
+                        let safe_day = std::cmp::min(target_day, days_in_month);
+                        if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
+                            self.selection = Selection {
+                                selection_type: SelectionType::Day(target_date),
+                                task_index_in_day: None,
+                            };
+                        }
+                    } else {
+                        self.selection = Selection {
+                            selection_type: SelectionType::Day(new_date),
+                            task_index_in_day: None,
+                        };
+                    }
                 }
             }
             SelectionType::Task(task_id) => {
+                let task_id = task_id.clone();
                 // Find the current task and move to previous task in the same day
-                if let Some(task) = tasks.iter().find(|t| &t.id == task_id) {
+                if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
                     let task_date = task.start.date_naive();
                     let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
                     
-                    if let Some(current_index) = day_tasks.iter().position(|t| &t.id == task_id) {
+                    if let Some(current_index) = day_tasks.iter().position(|t| t.id == task_id) {
                         if current_index > 0 {
                             // Move to previous task
                             let prev_task = &day_tasks[current_index - 1];
@@ -176,8 +197,9 @@ impl MonthView {
     pub fn move_down(&mut self, tasks: &[Task]) {
         match &self.selection.selection_type {
             SelectionType::Day(date) => {
+                let current_date = *date;
                 // Check if there are tasks on this day
-                let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(*date)).collect();
+                let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(current_date)).collect();
                 if !day_tasks.is_empty() {
                     // Move to first task
                     self.selection = Selection {
@@ -185,22 +207,43 @@ impl MonthView {
                         task_index_in_day: Some(0),
                     };
                 } else {
-                    // Move to the same day of the next week
-                    if let Some(new_date) = date.checked_add_signed(chrono::Duration::weeks(1)) {
-                        self.selection = Selection {
-                            selection_type: SelectionType::Day(new_date),
-                            task_index_in_day: None,
-                        };
+                    // Check if moving down a week would go outside current month
+                    if let Some(new_date) = current_date.checked_add_signed(chrono::Duration::weeks(1)) {
+                        if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                            // Go to next month
+                            let target_day = current_date.day();
+                            self.next_month();
+                            // Try to find a similar date in the new month
+                            let days_in_month = match self.current_date.month() {
+                                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                                4 | 6 | 9 | 11 => 30,
+                                2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
+                                _ => 31,
+                            };
+                            let safe_day = std::cmp::min(target_day, days_in_month);
+                            if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
+                                self.selection = Selection {
+                                    selection_type: SelectionType::Day(target_date),
+                                    task_index_in_day: None,
+                                };
+                            }
+                        } else {
+                            self.selection = Selection {
+                                selection_type: SelectionType::Day(new_date),
+                                task_index_in_day: None,
+                            };
+                        }
                     }
                 }
             }
             SelectionType::Task(task_id) => {
+                let task_id = task_id.clone();
                 // Find the current task and move to next task in the same day or to next week
-                if let Some(task) = tasks.iter().find(|t| &t.id == task_id) {
+                if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
                     let task_date = task.start.date_naive();
                     let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
                     
-                    if let Some(current_index) = day_tasks.iter().position(|t| &t.id == task_id) {
+                    if let Some(current_index) = day_tasks.iter().position(|t| t.id == task_id) {
                         if current_index < day_tasks.len() - 1 {
                             // Move to next task
                             let next_task = &day_tasks[current_index + 1];
@@ -211,10 +254,29 @@ impl MonthView {
                         } else {
                             // Move to next week same day
                             if let Some(new_date) = task_date.checked_add_signed(chrono::Duration::weeks(1)) {
-                                self.selection = Selection {
-                                    selection_type: SelectionType::Day(new_date),
-                                    task_index_in_day: None,
-                                };
+                                if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                                    // Go to next month
+                                    let target_day = task_date.day();
+                                    self.next_month();
+                                    let days_in_month = match self.current_date.month() {
+                                        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                                        4 | 6 | 9 | 11 => 30,
+                                        2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
+                                        _ => 31,
+                                    };
+                                    let safe_day = std::cmp::min(target_day, days_in_month);
+                                    if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
+                                        self.selection = Selection {
+                                            selection_type: SelectionType::Day(target_date),
+                                            task_index_in_day: None,
+                                        };
+                                    }
+                                } else {
+                                    self.selection = Selection {
+                                        selection_type: SelectionType::Day(new_date),
+                                        task_index_in_day: None,
+                                    };
+                                }
                             }
                         }
                     }
@@ -230,15 +292,39 @@ impl MonthView {
         match &self.selection.selection_type {
             SelectionType::Day(date) => {
                 if let Some(new_date) = date.checked_sub_signed(chrono::Duration::days(1)) {
+                    // Check if we're moving to a different month
+                    if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                        // Go to previous month and select the last day
+                        self.prev_month();
+                        let days_in_month = match self.current_date.month() {
+                            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                            4 | 6 | 9 | 11 => 30,
+                            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
+                            _ => 31,
+                        };
+                        if let Some(last_day) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), days_in_month) {
+                            self.selection = Selection {
+                                selection_type: SelectionType::Day(last_day),
+                                task_index_in_day: None,
+                            };
+                        }
+                    } else {
+                        self.selection = Selection {
+                            selection_type: SelectionType::Day(new_date),
+                            task_index_in_day: None,
+                        };
+                    }
+                }
+            }
+            SelectionType::Task(task_id) => {
+                // Move to the day containing this task
+                if let Some(task) = _tasks.iter().find(|t| &t.id == task_id) {
+                    let task_date = task.start.date_naive();
                     self.selection = Selection {
-                        selection_type: SelectionType::Day(new_date),
+                        selection_type: SelectionType::Day(task_date),
                         task_index_in_day: None,
                     };
                 }
-            }
-            SelectionType::Task(_task_id) => {
-                // Move to the day containing this task
-                // We'll implement this based on the task's date
             }
             SelectionType::WeekGoal(_) => {
                 // Stay on week goal
@@ -250,15 +336,33 @@ impl MonthView {
         match &self.selection.selection_type {
             SelectionType::Day(date) => {
                 if let Some(new_date) = date.checked_add_signed(chrono::Duration::days(1)) {
+                    // Check if we're moving to a different month
+                    if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                        // Go to next month and select the first day
+                        self.next_month();
+                        if let Some(first_day) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), 1) {
+                            self.selection = Selection {
+                                selection_type: SelectionType::Day(first_day),
+                                task_index_in_day: None,
+                            };
+                        }
+                    } else {
+                        self.selection = Selection {
+                            selection_type: SelectionType::Day(new_date),
+                            task_index_in_day: None,
+                        };
+                    }
+                }
+            }
+            SelectionType::Task(task_id) => {
+                // Move to the day containing this task
+                if let Some(task) = _tasks.iter().find(|t| &t.id == task_id) {
+                    let task_date = task.start.date_naive();
                     self.selection = Selection {
-                        selection_type: SelectionType::Day(new_date),
+                        selection_type: SelectionType::Day(task_date),
                         task_index_in_day: None,
                     };
                 }
-            }
-            SelectionType::Task(_task_id) => {
-                // Move to the day containing this task
-                // We'll implement this based on the task's date
             }
             SelectionType::WeekGoal(_) => {
                 // Stay on week goal
@@ -306,9 +410,17 @@ pub fn render_month_view(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
+    // Calculate the maximum number of tasks in any day for this month
+    let max_tasks_in_day = calculate_max_tasks_in_week(month_view, tasks);
+    
+    // Each week needs at least 3 rows (1 for goal, 1 for day number, 1+ for tasks)
+    // Add extra rows based on max tasks
+    let base_week_height = 3;
+    let week_height = base_week_height + max_tasks_in_day;
+    
     // Create layout for weeks
     let week_constraints: Vec<Constraint> = (0..month_view.weeks.len())
-        .map(|_| Constraint::Length(6)) // Each week gets 6 rows (1 for goals + 5 for days)
+        .map(|_| Constraint::Length(week_height as u16))
         .collect();
     
     let week_layout = Layout::vertical(week_constraints).split(inner_area);
@@ -321,8 +433,10 @@ pub fn render_month_view(
         let week_area = week_layout[week_index];
         
         // Split week area into goal row and day row
-        let week_split = Layout::vertical([Constraint::Length(1), Constraint::Length(5)])
-            .split(week_area);
+        let week_split = Layout::vertical([
+            Constraint::Length(1), 
+            Constraint::Length((week_height - 1) as u16)
+        ]).split(week_area);
         
         let goal_area = week_split[0];
         let day_area = week_split[1];
@@ -357,6 +471,20 @@ pub fn render_month_view(
             render_day_cell(frame, day_area, date, month_view, tasks);
         }
     }
+}
+
+fn calculate_max_tasks_in_week(month_view: &MonthView, tasks: &[Task]) -> usize {
+    let mut max_tasks = 0;
+    
+    for week in &month_view.weeks {
+        for &date in week {
+            let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+            max_tasks = max_tasks.max(day_tasks.len());
+        }
+    }
+    
+    // Ensure at least 1 row for tasks even if there are no tasks
+    max_tasks.max(1)
 }
 
 fn render_day_cell(
