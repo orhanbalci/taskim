@@ -411,12 +411,15 @@ pub fn render_month_view(
     frame.render_widget(block, area);
     
     // Calculate the maximum number of tasks in any day for this month
-    let max_tasks_in_day = calculate_max_tasks_in_week(month_view, tasks);
+    let max_tasks_in_day = calculate_max_tasks_in_month(month_view, tasks);
     
-    // Each week needs at least 3 rows (1 for goal, 1 for day number, 1+ for tasks)
-    // Add extra rows based on max tasks
+    // Each week needs:
+    // - 1 row for weekly goal
+    // - 2 rows minimum for day display (day number + basic task space)
+    // - Additional rows for tasks (at least 1 row per task for readability)
     let base_week_height = 3;
-    let week_height = base_week_height + max_tasks_in_day;
+    let additional_task_rows = if max_tasks_in_day > 0 { max_tasks_in_day } else { 1 };
+    let week_height = base_week_height + additional_task_rows;
     
     // Create layout for weeks
     let week_constraints: Vec<Constraint> = (0..month_view.weeks.len())
@@ -435,7 +438,7 @@ pub fn render_month_view(
         // Split week area into goal row and day row
         let week_split = Layout::vertical([
             Constraint::Length(1), 
-            Constraint::Length((week_height - 1) as u16)
+            Constraint::Length(week_height.saturating_sub(1) as u16)
         ]).split(week_area);
         
         let goal_area = week_split[0];
@@ -473,7 +476,7 @@ pub fn render_month_view(
     }
 }
 
-fn calculate_max_tasks_in_week(month_view: &MonthView, tasks: &[Task]) -> usize {
+fn calculate_max_tasks_in_month(month_view: &MonthView, tasks: &[Task]) -> usize {
     let mut max_tasks = 0;
     
     for week in &month_view.weeks {
@@ -483,8 +486,8 @@ fn calculate_max_tasks_in_week(month_view: &MonthView, tasks: &[Task]) -> usize 
         }
     }
     
-    // Ensure at least 1 row for tasks even if there are no tasks
-    max_tasks.max(1)
+    // Return actual max, don't force minimum of 1
+    max_tasks
 }
 
 fn render_day_cell(
@@ -533,7 +536,7 @@ fn render_day_cell(
     // Split inner area for day number and tasks
     let day_layout = Layout::vertical([
         Constraint::Length(1),  // Day number
-        Constraint::Min(0),     // Tasks
+        Constraint::Min(1),     // Tasks - ensure at least 1 line for tasks
     ]).split(inner_area);
     
     frame.render_widget(day_paragraph, day_layout[0]);
