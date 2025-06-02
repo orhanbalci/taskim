@@ -415,10 +415,10 @@ pub fn render_month_view(
     
     // Each week needs:
     // - 1 row for weekly goal
-    // - 2 rows minimum for day display (day number + basic task space)
-    // - Additional rows for tasks (at least 1 row per task for readability)
-    let base_week_height = 3;
-    let additional_task_rows = if max_tasks_in_day > 0 { max_tasks_in_day } else { 1 };
+    // - 1 row for day number (always visible)
+    // - Additional rows for tasks (unlimited expansion based on actual task count)
+    let base_week_height = 2; // goal + day number row
+    let additional_task_rows = max_tasks_in_day.max(1); // At least 1 row for tasks, but unlimited expansion
     let week_height = base_week_height + additional_task_rows;
     
     // Create layout for weeks
@@ -529,20 +529,21 @@ fn render_day_cell(
         return;
     }
     
-    // Day number
+    // Day number - always render and always visible
     let day_number = format!("{}", date.day());
     let day_paragraph = Paragraph::new(day_number).style(day_style);
     
     // Split inner area for day number and tasks
     let day_layout = Layout::vertical([
-        Constraint::Length(1),  // Day number
-        Constraint::Min(1),     // Tasks - ensure at least 1 line for tasks
+        Constraint::Length(1),  // Day number - always exactly 1 line
+        Constraint::Min(0),     // Tasks - expand to fill remaining space
     ]).split(inner_area);
     
+    // Always render the day number
     frame.render_widget(day_paragraph, day_layout[0]);
     
-    // Render tasks
-    if !day_tasks.is_empty() && day_layout.len() > 1 {
+    // Render tasks if there are any and if we have space for them
+    if !day_tasks.is_empty() && day_layout.len() > 1 && day_layout[1].height > 0 {
         let task_items: Vec<ListItem> = day_tasks
             .iter()
             .enumerate()
