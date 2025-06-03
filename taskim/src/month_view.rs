@@ -410,20 +410,30 @@ pub fn render_month_view(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    // Calculate the maximum number of tasks in any day for this month
-    let max_tasks_in_day = calculate_max_tasks_in_month(month_view, tasks);
-    
-    // Each week needs:
-    // - 1 row for weekly goal
-    // - 1 row for day number (always visible)
-    // - Additional rows for tasks (unlimited expansion based on actual task count)
-    let base_week_height = 2; // goal + day number row
-    let additional_task_rows = max_tasks_in_day.max(1); // At least 1 row for tasks, but unlimited expansion
-    let week_height = base_week_height + additional_task_rows;
-    
-    // Create layout for weeks
-    let week_constraints: Vec<Constraint> = (0..month_view.weeks.len())
-        .map(|_| Constraint::Length(week_height as u16))
+    // Calculate constraints for each week individually based on max tasks in that week
+    let week_constraints: Vec<Constraint> = month_view.weeks.iter()
+        .map(|week| {
+            // Calculate max tasks for this specific week
+            let max_tasks_in_week = week.iter()
+                .map(|&date| {
+                    let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+                    day_tasks.len()
+                })
+                .max()
+                .unwrap_or(0);
+            
+            // Each week needs:
+            // - 1 row for weekly goal
+            // - Minimum 4 rows for day cells (1 for day number + 3 minimum for tasks/spacing)
+            // - Additional rows for tasks (unlimited expansion based on actual task count in this week)
+            let minimum_week_height = 5; // goal (1) + minimum day cell height (4 lines minimum)
+            let base_week_height = 2; // goal + day number base
+            let additional_task_rows = max_tasks_in_week; // Unlimited expansion based on actual tasks
+            let calculated_height = base_week_height + additional_task_rows.max(2); // Ensure at least 2 rows for tasks
+            let week_height = calculated_height.max(minimum_week_height); // Enforce absolute minimum
+            
+            Constraint::Length(week_height as u16)
+        })
         .collect();
     
     let week_layout = Layout::vertical(week_constraints).split(inner_area);
@@ -435,10 +445,24 @@ pub fn render_month_view(
         
         let week_area = week_layout[week_index];
         
+        // Calculate the height for this specific week (recalculate to match constraint logic)
+        let max_tasks_in_week = week.iter()
+            .map(|&date| {
+                let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+                day_tasks.len()
+            })
+            .max()
+            .unwrap_or(0);
+        let minimum_week_height = 5;
+        let base_week_height = 2;
+        let additional_task_rows = max_tasks_in_week;
+        let calculated_height = base_week_height + additional_task_rows.max(2);
+        let calculated_week_height = calculated_height.max(minimum_week_height);
+        
         // Split week area into goal row and day row
         let week_split = Layout::vertical([
             Constraint::Length(1), 
-            Constraint::Length(week_height.saturating_sub(1) as u16)
+            Constraint::Length((calculated_week_height.saturating_sub(1)).max(4) as u16) // Ensure minimum 4 lines for day cells
         ]).split(week_area);
         
         let goal_area = week_split[0];
@@ -476,19 +500,6 @@ pub fn render_month_view(
     }
 }
 
-fn calculate_max_tasks_in_month(month_view: &MonthView, tasks: &[Task]) -> usize {
-    let mut max_tasks = 0;
-    
-    for week in &month_view.weeks {
-        for &date in week {
-            let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
-            max_tasks = max_tasks.max(day_tasks.len());
-        }
-    }
-    
-    // Return actual max, don't force minimum of 1
-    max_tasks
-}
 
 fn render_day_cell(
     frame: &mut Frame,
@@ -525,22 +536,25 @@ fn render_day_cell(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    if inner_area.height == 0 || inner_area.width == 0 {
-        return;
-    }
-    
-    // Day number - always render and always visible
+    // Always render day number, even if space is very limited
     let day_number = format!("{}", date.day());
     let day_paragraph = Paragraph::new(day_number).style(day_style);
     
+    if inner_area.height == 0 || inner_area.width == 0 {
+        // If no inner space, just return - the border should still be visible
+        return;
+    }
+
     // Split inner area for day number and tasks
     let day_layout = Layout::vertical([
         Constraint::Length(1),  // Day number - always exactly 1 line
-        Constraint::Min(0),     // Tasks - expand to fill remaining space
+        Constraint::Min(0),     // Tasks - expand to fill remaining space, can be 0 if no space
     ]).split(inner_area);
     
-    // Always render the day number
-    frame.render_widget(day_paragraph, day_layout[0]);
+    // Always render the day number if we have any space
+    if day_layout.len() > 0 && day_layout[0].height > 0 {
+        frame.render_widget(day_paragraph, day_layout[0]);
+    }
     
     // Render tasks if there are any and if we have space for them
     if !day_tasks.is_empty() && day_layout.len() > 1 && day_layout[1].height > 0 {
