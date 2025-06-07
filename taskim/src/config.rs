@@ -30,16 +30,26 @@ pub struct Config {
     pub insert_edit: KeyBinding,
     pub delete: KeyBinding,
     pub toggle_complete: KeyBinding,
+    pub yank: KeyBinding,
+    pub paste: KeyBinding,
     
     // Undo/Redo
     pub undo: KeyBinding,
     pub redo: KeyBinding,
     
-    // Month/Year navigation
+    // Month/Year navigation (vim-style)
     pub next_month: KeyBinding,
     pub prev_month: KeyBinding,
     pub next_year: KeyBinding,
     pub prev_year: KeyBinding,
+    
+    // Week navigation (vim-style)
+    pub next_week: KeyBinding,
+    pub prev_week: KeyBinding,
+    
+    // Day navigation (vim-style)
+    pub first_day_of_month: KeyBinding,
+    pub last_day_of_month: KeyBinding,
     
     // Task editing
     pub save_task: KeyBinding,
@@ -69,15 +79,27 @@ pub const KEYBINDINGS: Config = Config {
     delete: KeyBinding { key: KeyCode::Char('x'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
     toggle_complete: KeyBinding { key: KeyCode::Char('c'), modifiers: KeyModifiers::NONE, description: "Toggle Complete", color: Color::Blue },
     
-    // Undo/Redo
-    undo: KeyBinding { key: KeyCode::Char('u'), modifiers: KeyModifiers::NONE, description: "Undo", color: Color::Yellow },
-    redo: KeyBinding { key: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL, description: "Redo", color: Color::Yellow },
+    // Yank/Paste (vim-style)
+    yank: KeyBinding { key: KeyCode::Char('y'), modifiers: KeyModifiers::NONE, description: "Yank (Copy)", color: Color::Yellow },
+    paste: KeyBinding { key: KeyCode::Char('p'), modifiers: KeyModifiers::NONE, description: "Paste", color: Color::Yellow },
     
-    // Month/Year navigation
-    next_month: KeyBinding { key: KeyCode::Char('n'), modifiers: KeyModifiers::NONE, description: "Next Month", color: Color::Cyan },
-    prev_month: KeyBinding { key: KeyCode::Char('p'), modifiers: KeyModifiers::NONE, description: "Prev Month", color: Color::Cyan },
-    next_year: KeyBinding { key: KeyCode::Char('N'), modifiers: KeyModifiers::SHIFT, description: "Next Year", color: Color::Cyan },
-    prev_year: KeyBinding { key: KeyCode::Char('P'), modifiers: KeyModifiers::SHIFT, description: "Prev Year", color: Color::Cyan },
+    // Undo/Redo
+    undo: KeyBinding { key: KeyCode::Char('u'), modifiers: KeyModifiers::NONE, description: "Undo", color: Color::Magenta },
+    redo: KeyBinding { key: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL, description: "Redo", color: Color::Magenta },
+    
+    // Month/Year navigation (vim-style)
+    next_month: KeyBinding { key: KeyCode::Char('L'), modifiers: KeyModifiers::SHIFT, description: "Next Month", color: Color::Cyan },
+    prev_month: KeyBinding { key: KeyCode::Char('H'), modifiers: KeyModifiers::SHIFT, description: "Prev Month", color: Color::Cyan },
+    next_year: KeyBinding { key: KeyCode::Char('G'), modifiers: KeyModifiers::SHIFT, description: "Last Year", color: Color::Cyan },
+    prev_year: KeyBinding { key: KeyCode::Char('g'), modifiers: KeyModifiers::NONE, description: "First Year (gg)", color: Color::Cyan },
+    
+    // Week navigation (vim-style)
+    next_week: KeyBinding { key: KeyCode::Char('w'), modifiers: KeyModifiers::NONE, description: "Next Week", color: Color::Blue },
+    prev_week: KeyBinding { key: KeyCode::Char('b'), modifiers: KeyModifiers::NONE, description: "Previous Week", color: Color::Blue },
+    
+    // Day navigation (vim-style)
+    first_day_of_month: KeyBinding { key: KeyCode::Char('0'), modifiers: KeyModifiers::NONE, description: "First Day", color: Color::Blue },
+    last_day_of_month: KeyBinding { key: KeyCode::Char('$'), modifiers: KeyModifiers::SHIFT, description: "Last Day", color: Color::Blue },
     
     // Task editing
     save_task: KeyBinding { key: KeyCode::Enter, modifiers: KeyModifiers::NONE, description: "Save", color: Color::Green },
@@ -126,6 +148,14 @@ impl Config {
         spans.push(Span::raw(": Insert/Edit | "));
         spans.push(Span::styled("x", Style::default().fg(self.delete.color)));
         spans.push(Span::raw(": Delete | "));
+        spans.push(Span::styled("c", Style::default().fg(self.toggle_complete.color)));
+        spans.push(Span::raw(": Toggle Complete | "));
+        
+        // Yank/Paste
+        spans.push(Span::styled("y", Style::default().fg(self.yank.color)));
+        spans.push(Span::raw(": Yank | "));
+        spans.push(Span::styled("p", Style::default().fg(self.paste.color)));
+        spans.push(Span::raw(": Paste | "));
         
         // Undo/Redo (only show if available)
         if can_undo {
@@ -137,15 +167,19 @@ impl Config {
             spans.push(Span::raw(": Redo | "));
         }
         
-        // Other operations
-        spans.push(Span::styled("c", Style::default().fg(self.toggle_complete.color)));
-        spans.push(Span::raw(": Toggle Complete | "));
-        
-        // Month/Year navigation (show combined)
-        spans.push(Span::styled("n/p", Style::default().fg(Color::Cyan)));
+        // Month/Year navigation (vim-style)
+        spans.push(Span::styled("H/L", Style::default().fg(Color::Cyan)));
         spans.push(Span::raw(": Month | "));
-        spans.push(Span::styled("N/P", Style::default().fg(Color::Cyan)));
+        spans.push(Span::styled("gg/G", Style::default().fg(Color::Cyan)));
         spans.push(Span::raw(": Year | "));
+        
+        // Week navigation
+        spans.push(Span::styled("w/b", Style::default().fg(self.next_week.color)));
+        spans.push(Span::raw(": Week | "));
+        
+        // Day navigation
+        spans.push(Span::styled("0/$", Style::default().fg(self.first_day_of_month.color)));
+        spans.push(Span::raw(": Day | "));
         
         // Quit
         spans.push(Span::styled("q", Style::default().fg(self.quit.color)));

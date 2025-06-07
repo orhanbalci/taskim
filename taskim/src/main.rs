@@ -35,6 +35,7 @@ struct App {
     month_view: MonthView,
     should_exit: bool,
     undo_stack: UndoStack,
+    yanked_task: Option<crate::task::Task>, // Store yanked task for paste operation
 }
 
 impl App {
@@ -49,6 +50,7 @@ impl App {
             month_view,
             should_exit: false,
             undo_stack: UndoStack::new(50), // Allow up to 50 undo operations
+            yanked_task: None,
         }
     }
     
@@ -268,18 +270,65 @@ impl App {
                     self.save()?;
                 }
             }
+        } else if KEYBINDINGS.yank.matches(key.code, key.modifiers) {
+            // Yank (copy) task
+            if let Some(task_id) = self.month_view.get_selected_task_id() {
+                if let Some(task) = self.data.events.iter().find(|t| t.id == task_id) {
+                    self.yanked_task = Some(task.clone());
+                }
+            }
+        } else if KEYBINDINGS.paste.matches(key.code, key.modifiers) {
+            // Paste task
+            if let Some(yanked_task) = &self.yanked_task {
+                let selected_date = self.month_view.get_selected_date();
+                let mut new_task = yanked_task.clone();
+                
+                // Generate new ID for the pasted task
+                new_task.id = format!("task_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default());
+                
+                // Set new start/end times for the selected date
+                let duration = new_task.end - new_task.start;
+                let new_start = selected_date.and_hms_opt(
+                    new_task.start.time().hour(),
+                    new_task.start.time().minute(),
+                    new_task.start.time().second()
+                ).unwrap().and_utc();
+                new_task.start = new_start;
+                new_task.end = new_start + duration;
+                
+                // Track the paste operation for undo
+                self.undo_stack.push(Operation::CreateTask {
+                    task: new_task.clone(),
+                });
+                
+                // Add the task to data
+                self.data.events.push(new_task);
+                self.save()?;
+            }
         } else if KEYBINDINGS.next_month.matches(key.code, key.modifiers) {
-            // Next month
+            // Next month (vim-style: L)
             self.month_view.next_month();
         } else if KEYBINDINGS.prev_month.matches(key.code, key.modifiers) {
-            // Previous month
+            // Previous month (vim-style: H)
             self.month_view.prev_month();
         } else if KEYBINDINGS.next_year.matches(key.code, key.modifiers) {
-            // Next year
+            // Next/Last year (vim-style: G)
             self.month_view.next_year();
         } else if KEYBINDINGS.prev_year.matches(key.code, key.modifiers) {
-            // Previous year
+            // Previous/First year (vim-style: gg)
             self.month_view.prev_year();
+        } else if KEYBINDINGS.next_week.matches(key.code, key.modifiers) {
+            // Next week (vim-style: w)
+            self.month_view.next_week();
+        } else if KEYBINDINGS.prev_week.matches(key.code, key.modifiers) {
+            // Previous week (vim-style: b)
+            self.month_view.prev_week();
+        } else if KEYBINDINGS.first_day_of_month.matches(key.code, key.modifiers) {
+            // First day of month (vim-style: 0)
+            self.month_view.first_day_of_month();
+        } else if KEYBINDINGS.last_day_of_month.matches(key.code, key.modifiers) {
+            // Last day of month (vim-style: $)
+            self.month_view.last_day_of_month();
         }
         Ok(())
     }

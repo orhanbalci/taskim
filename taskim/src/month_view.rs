@@ -378,6 +378,77 @@ impl MonthView {
             _ => None,
         }
     }
+
+    // Get the currently selected date
+    pub fn get_selected_date(&self) -> NaiveDate {
+        match &self.selection.selection_type {
+            SelectionType::Day(date) => *date,
+            SelectionType::Task(_task_id) => {
+                // If a task is selected, return the current date as fallback
+                // In a real implementation, you might want to find the task's date
+                self.current_date
+            }
+            SelectionType::WeekGoal(_) => self.current_date,
+        }
+    }
+
+    // Move to next week (same day of week)
+    pub fn next_week(&mut self) {
+        let current_selected = self.get_selected_date();
+        if let Some(new_date) = current_selected.checked_add_signed(chrono::Duration::weeks(1)) {
+            // Check if we need to change months
+            if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                self.current_date = new_date.with_day(1).unwrap();
+                self.weeks = Self::build_weeks(self.current_date);
+            }
+            self.selection = Selection {
+                selection_type: SelectionType::Day(new_date),
+                task_index_in_day: None,
+            };
+        }
+    }
+
+    // Move to previous week (same day of week)
+    pub fn prev_week(&mut self) {
+        let current_selected = self.get_selected_date();
+        if let Some(new_date) = current_selected.checked_sub_signed(chrono::Duration::weeks(1)) {
+            // Check if we need to change months
+            if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
+                self.current_date = new_date.with_day(1).unwrap();
+                self.weeks = Self::build_weeks(self.current_date);
+            }
+            self.selection = Selection {
+                selection_type: SelectionType::Day(new_date),
+                task_index_in_day: None,
+            };
+        }
+    }
+
+    // Move to first day of current month
+    pub fn first_day_of_month(&mut self) {
+        let first_day = self.current_date.with_day(1).unwrap();
+        self.selection = Selection {
+            selection_type: SelectionType::Day(first_day),
+            task_index_in_day: None,
+        };
+    }
+
+    // Move to last day of current month
+    pub fn last_day_of_month(&mut self) {
+        let days_in_month = match self.current_date.month() {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
+            _ => 31,
+        };
+        
+        if let Some(last_day) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), days_in_month) {
+            self.selection = Selection {
+                selection_type: SelectionType::Day(last_day),
+                task_index_in_day: None,
+            };
+        }
+    }
 }
 
 pub fn render_month_view(
