@@ -13,36 +13,6 @@ pub struct KeyBinding {
 }
 
 impl KeyBinding {
-    #[allow(dead_code)]
-    pub fn new(key: KeyCode, description: &'static str, color: Color) -> Self {
-        Self {
-            key,
-            modifiers: KeyModifiers::NONE,
-            description,
-            color,
-        }
-    }
-    
-    #[allow(dead_code)]
-    pub fn ctrl(key: KeyCode, description: &'static str, color: Color) -> Self {
-        Self {
-            key,
-            modifiers: KeyModifiers::CONTROL,
-            description,
-            color,
-        }
-    }
-    
-    #[allow(dead_code)]
-    pub fn shift(key: KeyCode, description: &'static str, color: Color) -> Self {
-        Self {
-            key,
-            modifiers: KeyModifiers::SHIFT,
-            description,
-            color,
-        }
-    }
-    
     pub fn matches(&self, key: KeyCode, modifiers: KeyModifiers) -> bool {
         self.key == key && self.modifiers == modifiers
     }
@@ -122,23 +92,23 @@ pub const KEYBINDINGS: Config = Config {
 };
 
 // ============================================================================
-// EXAMPLES - Uncomment and modify to customize
+// EXAMPLES - To customize, edit the KEYBINDINGS constant above
 // ============================================================================
-
-// Arrow keys instead of hjkl:
-// pub const KEYBINDINGS: Config = Config {
-//     move_left: KeyBinding { key: KeyCode::Left, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//     move_down: KeyBinding { key: KeyCode::Down, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//     move_up: KeyBinding { key: KeyCode::Up, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//     move_right: KeyBinding { key: KeyCode::Right, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//     ..KEYBINDINGS  // Keep other defaults
-// };
-
-// Different delete key:
-// pub const KEYBINDINGS: Config = Config {
-//     delete: KeyBinding { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
-//     ..KEYBINDINGS
-// };
+//
+// To change navigation to arrow keys, replace the movement bindings:
+//   move_left: KeyBinding { key: KeyCode::Left, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+//   move_down: KeyBinding { key: KeyCode::Down, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+//   move_up: KeyBinding { key: KeyCode::Up, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+//   move_right: KeyBinding { key: KeyCode::Right, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+//
+// To change delete key from 'x' to 'd':
+//   delete: KeyBinding { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
+//
+// To add Ctrl modifier:
+//   some_key: KeyBinding { key: KeyCode::Char('s'), modifiers: KeyModifiers::CONTROL, description: "Save", color: Color::Green },
+//
+// To add Shift modifier:
+//   some_key: KeyBinding { key: KeyCode::Char('S'), modifiers: KeyModifiers::SHIFT, description: "Save All", color: Color::Green },
 
 // Helper functions for UI
 impl Config {
