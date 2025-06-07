@@ -3,20 +3,22 @@ mod month_view;
 mod task_edit;
 mod data;
 mod undo;
+mod config;
 
 use crate::month_view::{MonthView, render_month_view, SelectionType};
-use crate::task::{TaskData, Task};
+use crate::task::TaskData;
 use crate::task_edit::{TaskEditState, render_task_edit_popup};
 use crate::data::{load_data, save_data};
 use crate::undo::{UndoStack, Operation};
+use crate::config::KEYBINDINGS;
 
 use chrono::{Local, Timelike};
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Borders, Paragraph},
     DefaultTerminal, Frame,
 };
@@ -93,187 +95,210 @@ impl App {
     }
     
     fn handle_normal_mode_key(&mut self, key: crossterm::event::KeyEvent) -> Result<()> {
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            match key.code {
-                KeyCode::Char('c') => self.should_exit = true,
-                _ => {}
-            }
+        // Handle keybindings
+        if KEYBINDINGS.force_quit.matches(key.code, key.modifiers) {
+            self.should_exit = true;
             return Ok(());
         }
         
-        // Handle space + key combinations for month/year navigation
-        if key.modifiers.contains(KeyModifiers::SHIFT) {
-            match key.code {
-                KeyCode::Char(' ') => {
-                    // Wait for next key for space combinations
-                    // For now, we'll handle them as individual keys
+        if KEYBINDINGS.quit.matches(key.code, key.modifiers) || 
+           KEYBINDINGS.quit_alt.matches(key.code, key.modifiers) {
+            self.should_exit = true;
+        } else if KEYBINDINGS.move_left.matches(key.code, key.modifiers) {
+            self.month_view.move_left(&self.data.events);
+        } else if KEYBINDINGS.move_down.matches(key.code, key.modifiers) {
+            self.month_view.move_down(&self.data.events);
+        } else if KEYBINDINGS.move_up.matches(key.code, key.modifiers) {
+            self.month_view.move_up(&self.data.events);
+        } else if KEYBINDINGS.move_right.matches(key.code, key.modifiers) {
+            self.month_view.move_right(&self.data.events);
+        } else if KEYBINDINGS.insert_edit.matches(key.code, key.modifiers) {
+            match &self.month_view.selection.selection_type {
+                SelectionType::Day(date) => {
+                    // Create new task
+                    let edit_state = TaskEditState::new_task(*date);
+                    self.mode = AppMode::TaskEdit(edit_state);
                 }
-                _ => {}
-            }
-        }
-        
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
-            KeyCode::Char('h') => self.month_view.move_left(&self.data.events),
-            KeyCode::Char('j') => self.month_view.move_down(&self.data.events),
-            KeyCode::Char('k') => self.month_view.move_up(&self.data.events),
-            KeyCode::Char('l') => self.month_view.move_right(&self.data.events),
-            KeyCode::Char('i') => {
-                match &self.month_view.selection.selection_type {
-                    SelectionType::Day(date) => {
-                        // Create new task
-                        let edit_state = TaskEditState::new_task(*date);
+                SelectionType::Task(task_id) => {
+                    // Edit existing task
+                    if let Some(task) = self.data.events.iter().find(|t| &t.id == task_id) {
+                        let edit_state = TaskEditState::edit_task(task);
                         self.mode = AppMode::TaskEdit(edit_state);
                     }
-                    SelectionType::Task(task_id) => {
-                        // Edit existing task
-                        if let Some(task) = self.data.events.iter().find(|t| &t.id == task_id) {
-                            let edit_state = TaskEditState::edit_task(task);
-                            self.mode = AppMode::TaskEdit(edit_state);
-                        }
-                    }
-                    SelectionType::WeekGoal(_) => {
-                        // TODO: Edit weekly goal
-                    }
+                }
+                SelectionType::WeekGoal(_) => {
+                    // TODO: Edit weekly goal
                 }
             }
-            KeyCode::Char('x') => {
-                // Immediately delete the selected task
-                if let Some(task_id) = self.month_view.get_selected_task_id() {
-                    if let Some(task_index) = self.data.events.iter().position(|t| t.id == task_id) {
-                        let deleted_task = self.data.events.remove(task_index);
-                        let task_date = deleted_task.start.date_naive();
-                        
-                        // Track deletion for undo functionality
-                        self.undo_stack.push(Operation::DeleteTask {
-                            task: deleted_task,
-                            original_date: task_date,
-                        });
-                        
-                        // Check if there are any remaining tasks on the same date
-                        let remaining_tasks: Vec<_> = self.data.events.iter()
-                            .filter(|t| t.is_on_date(task_date))
-                            .collect();
-                        
-                        if remaining_tasks.is_empty() {
-                            // No more tasks on this day, select the day itself
-                            self.month_view.selection = month_view::Selection {
-                                selection_type: month_view::SelectionType::Day(task_date),
-                                task_index_in_day: None,
-                            };
-                        } else {
-                            // Select the first remaining task
-                            self.month_view.selection = month_view::Selection {
-                                selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
-                                task_index_in_day: Some(0),
-                            };
-                        }
-                        
-                        self.save()?;
+        } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {
+            // Immediately delete the selected task
+            if let Some(task_id) = self.month_view.get_selected_task_id() {
+                if let Some(task_index) = self.data.events.iter().position(|t| t.id == task_id) {
+                    let deleted_task = self.data.events.remove(task_index);
+                    let task_date = deleted_task.start.date_naive();
+                    
+                    // Track deletion for undo functionality
+                    self.undo_stack.push(Operation::DeleteTask {
+                        task: deleted_task,
+                        original_date: task_date,
+                    });
+                    
+                    // Check if there are any remaining tasks on the same date
+                    let remaining_tasks: Vec<_> = self.data.events.iter()
+                        .filter(|t| t.is_on_date(task_date))
+                        .collect();
+                    
+                    if remaining_tasks.is_empty() {
+                        // No more tasks on this day, select the day itself
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Day(task_date),
+                            task_index_in_day: None,
+                        };
+                    } else {
+                        // Select the first remaining task
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
+                            task_index_in_day: Some(0),
+                        };
                     }
-                }
-            }
-            KeyCode::Char('u') => {
-                // Undo last operation
-                if let Some(operation) = self.undo_stack.pop() {
-                    match operation {
-                        Operation::DeleteTask { task, original_date } => {
-                            // Restore deleted task
-                            self.data.events.push(task.clone());
-                            
-                            // Select the restored task
-                            self.month_view.selection = month_view::Selection {
-                                selection_type: month_view::SelectionType::Task(task.id),
-                                task_index_in_day: Some(0),
-                            };
-                        }
-                        Operation::EditTask { task_id, old_task, new_task: _ } => {
-                            // Revert task edit
-                            if let Some(existing) = self.data.events.iter_mut().find(|t| t.id == task_id) {
-                                *existing = old_task;
-                            }
-                        }
-                        Operation::CreateTask { task } => {
-                            // Remove created task
-                            self.data.events.retain(|t| t.id != task.id);
-                            
-                            // Select the day where the task was
-                            let task_date = task.start.date_naive();
-                            self.month_view.selection = month_view::Selection {
-                                selection_type: month_view::SelectionType::Day(task_date),
-                                task_index_in_day: None,
-                            };
-                        }
-                        Operation::YankPaste { task_id, old_date, new_date } => {
-                            // TODO: Implement when yank/paste is added
-                            // For now, we'll revert the task to its old date
-                            if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
-                                let duration = task.end - task.start;
-                                let old_datetime = old_date.and_hms_opt(
-                                    task.start.time().hour(),
-                                    task.start.time().minute(),
-                                    task.start.time().second()
-                                ).unwrap().and_utc();
-                                task.start = old_datetime;
-                                task.end = old_datetime + duration;
-                            }
-                        }
-                    }
+                    
                     self.save()?;
                 }
             }
-            KeyCode::Char('c') => {
-                // Toggle task completion
-                if let Some(task_id) = self.month_view.get_selected_task_id() {
-                    if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
-                        task.completed = !task.completed;
-                        self.save()?;
+        } else if KEYBINDINGS.undo.matches(key.code, key.modifiers) {
+            // Undo last operation
+            if let Some(operation) = self.undo_stack.undo() {
+                match operation {
+                    Operation::DeleteTask { task, original_date: _ } => {
+                        // Restore deleted task
+                        self.data.events.push(task.clone());
+                        
+                        // Select the restored task
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Task(task.id),
+                            task_index_in_day: Some(0),
+                        };
+                    }
+                    Operation::EditTask { task_id, old_task, new_task: _ } => {
+                        // Revert task edit
+                        if let Some(existing) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                            *existing = old_task;
+                        }
+                    }
+                    Operation::CreateTask { task } => {
+                        // Remove created task
+                        self.data.events.retain(|t| t.id != task.id);
+                        
+                        // Select the day where the task was
+                        let task_date = task.start.date_naive();
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Day(task_date),
+                            task_index_in_day: None,
+                        };
+                    }
+                    Operation::YankPaste { task_id, old_date, new_date: _ } => {
+                        // TODO: Implement when yank/paste is added
+                        // For now, we'll revert the task to its old date
+                        if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                            let duration = task.end - task.start;
+                            let old_datetime = old_date.and_hms_opt(
+                                task.start.time().hour(),
+                                task.start.time().minute(),
+                                task.start.time().second()
+                            ).unwrap().and_utc();
+                            task.start = old_datetime;
+                            task.end = old_datetime + duration;
+                        }
                     }
                 }
+                self.save()?;
             }
-            KeyCode::Char('n') => {
-                // Next month
-                self.month_view.next_month();
+        } else if KEYBINDINGS.redo.matches(key.code, key.modifiers) {
+            // Redo last undone operation
+            if let Some(operation) = self.undo_stack.redo() {
+                match operation {
+                    Operation::DeleteTask { task, original_date: _ } => {
+                        // Re-delete the task
+                        self.data.events.retain(|t| t.id != task.id);
+                        
+                        // Select the day where the task was
+                        let task_date = task.start.date_naive();
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Day(task_date),
+                            task_index_in_day: None,
+                        };
+                    }
+                    Operation::EditTask { task_id, old_task: _, new_task } => {
+                        // Re-apply task edit
+                        if let Some(existing) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                            *existing = new_task;
+                        }
+                    }
+                    Operation::CreateTask { task } => {
+                        // Re-create task
+                        self.data.events.push(task.clone());
+                        
+                        // Select the restored task
+                        self.month_view.selection = month_view::Selection {
+                            selection_type: month_view::SelectionType::Task(task.id),
+                            task_index_in_day: Some(0),
+                        };
+                    }
+                    Operation::YankPaste { task_id, old_date: _, new_date } => {
+                        // TODO: Implement when yank/paste is added
+                        if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                            let duration = task.end - task.start;
+                            let new_datetime = new_date.and_hms_opt(
+                                task.start.time().hour(),
+                                task.start.time().minute(),
+                                task.start.time().second()
+                            ).unwrap().and_utc();
+                            task.start = new_datetime;
+                            task.end = new_datetime + duration;
+                        }
+                    }
+                }
+                self.save()?;
             }
-            KeyCode::Char('p') => {
-                // Previous month
-                self.month_view.prev_month();
+        } else if KEYBINDINGS.toggle_complete.matches(key.code, key.modifiers) {
+            // Toggle task completion
+            if let Some(task_id) = self.month_view.get_selected_task_id() {
+                if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                    task.completed = !task.completed;
+                    self.save()?;
+                }
             }
-            KeyCode::Char('N') => {
-                // Next year
-                self.month_view.next_year();
-            }
-            KeyCode::Char('P') => {
-                // Previous year
-                self.month_view.prev_year();
-            }
-            _ => {}
+        } else if KEYBINDINGS.next_month.matches(key.code, key.modifiers) {
+            // Next month
+            self.month_view.next_month();
+        } else if KEYBINDINGS.prev_month.matches(key.code, key.modifiers) {
+            // Previous month
+            self.month_view.prev_month();
+        } else if KEYBINDINGS.next_year.matches(key.code, key.modifiers) {
+            // Next year
+            self.month_view.next_year();
+        } else if KEYBINDINGS.prev_year.matches(key.code, key.modifiers) {
+            // Previous year
+            self.month_view.prev_year();
         }
         Ok(())
     }
     
     fn handle_task_edit_key(&mut self, key: crossterm::event::KeyEvent, state: &mut TaskEditState) -> Result<bool> {
-        match key.code {
-            KeyCode::Esc => {
-                // Cancel edit
+        if KEYBINDINGS.cancel_edit.matches(key.code, key.modifiers) {
+            // Cancel edit
+            return Ok(true);
+        } else if KEYBINDINGS.save_task.matches(key.code, key.modifiers) {
+            // Save task
+            if !state.title.trim().is_empty() {
                 return Ok(true);
             }
-            KeyCode::Enter => {
-                // Save task
-                if !state.title.trim().is_empty() {
-                    return Ok(true);
-                }
-            }
-            KeyCode::Tab => {
-                state.switch_field();
-            }
-            KeyCode::Backspace => {
-                state.remove_char();
-            }
-            KeyCode::Char(ch) => {
-                state.add_char(ch);
-            }
-            _ => {}
+        } else if KEYBINDINGS.switch_field.matches(key.code, key.modifiers) {
+            state.switch_field();
+        } else if KEYBINDINGS.backspace.matches(key.code, key.modifiers) {
+            state.remove_char();
+        } else if let KeyCode::Char(ch) = key.code {
+            state.add_char(ch);
         }
         Ok(false)
     }
@@ -334,47 +359,15 @@ impl App {
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
         let help_text = match &self.mode {
             AppMode::Normal => {
-                let mut spans = vec![
-                    Span::styled("hjkl", Style::default().fg(Color::Green)),
-                    Span::raw(": Move | "),
-                    Span::styled("i", Style::default().fg(Color::Green)),
-                    Span::raw(": Insert/Edit | "),
-                    Span::styled("x", Style::default().fg(Color::Red)),
-                    Span::raw(": Delete | "),
-                ];
-                
-                // Add undo option if there are operations to undo
-                if !self.undo_stack.is_empty() {
-                    spans.extend(vec![
-                        Span::styled("u", Style::default().fg(Color::Yellow)),
-                        Span::raw(": Undo | "),
-                    ]);
-                }
-                
-                spans.extend(vec![
-                    Span::styled("c", Style::default().fg(Color::Blue)),
-                    Span::raw(": Toggle Complete | "),
-                    Span::styled("n/p", Style::default().fg(Color::Yellow)),
-                    Span::raw(": Month | "),
-                    Span::styled("N/P", Style::default().fg(Color::Yellow)),
-                    Span::raw(": Year | "),
-                    Span::styled("q", Style::default().fg(Color::Red)),
-                    Span::raw(": Quit"),
-                ]);
-                
+                let spans = KEYBINDINGS.get_normal_mode_help_spans(
+                    self.undo_stack.can_undo(),
+                    self.undo_stack.can_redo()
+                );
                 vec![Line::from(spans)]
             }
             AppMode::TaskEdit(_) => {
-                vec![
-                    Line::from(vec![
-                        Span::styled("Tab", Style::default().fg(Color::Green)),
-                        Span::raw(": Switch field | "),
-                        Span::styled("Enter", Style::default().fg(Color::Green)),
-                        Span::raw(": Save | "),
-                        Span::styled("Esc", Style::default().fg(Color::Red)),
-                        Span::raw(": Cancel"),
-                    ])
-                ]
+                let spans = KEYBINDINGS.get_edit_mode_help_spans();
+                vec![Line::from(spans)]
             }
         };
         

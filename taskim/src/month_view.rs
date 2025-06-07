@@ -12,12 +12,14 @@ use std::collections::HashMap;
 pub enum SelectionType {
     Day(NaiveDate),
     Task(String), // task id
+    #[allow(dead_code)]
     WeekGoal(String), // week key
 }
 
 #[derive(Debug, Clone)]
 pub struct Selection {
     pub selection_type: SelectionType,
+    #[allow(dead_code)]
     pub task_index_in_day: Option<usize>,
 }
 
@@ -367,17 +369,6 @@ impl MonthView {
             SelectionType::WeekGoal(_) => {
                 // Stay on week goal
             }
-        }
-    }
-    
-    pub fn get_selected_date(&self) -> Option<NaiveDate> {
-        match &self.selection.selection_type {
-            SelectionType::Day(date) => Some(*date),
-            SelectionType::Task(_task_id) => {
-                // We'd need to look up the task to get its date
-                None
-            }
-            SelectionType::WeekGoal(_) => None,
         }
     }
     
