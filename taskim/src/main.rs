@@ -2,13 +2,15 @@ mod task;
 mod month_view;
 mod task_edit;
 mod data;
+mod undo;
 
 use crate::month_view::{MonthView, render_month_view, SelectionType};
-use crate::task::TaskData;
+use crate::task::{TaskData, Task};
 use crate::task_edit::{TaskEditState, render_task_edit_popup};
 use crate::data::{load_data, save_data};
+use crate::undo::{UndoStack, Operation};
 
-use chrono::Local;
+use chrono::{Local, Timelike};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
@@ -23,7 +25,6 @@ use ratatui::{
 enum AppMode {
     Normal,
     TaskEdit(TaskEditState),
-    ConfirmDelete(String), // task id
 }
 
 struct App {
@@ -31,6 +32,7 @@ struct App {
     data: TaskData,
     month_view: MonthView,
     should_exit: bool,
+    undo_stack: UndoStack,
 }
 
 impl App {
@@ -44,6 +46,7 @@ impl App {
             data,
             month_view,
             should_exit: false,
+            undo_stack: UndoStack::new(50), // Allow up to 50 undo operations
         }
     }
     
@@ -61,58 +64,28 @@ impl App {
                     // Task edit completed
                     let task = new_state.to_task();
                     if new_state.is_new_task {
+                        // Track task creation
+                        self.undo_stack.push(Operation::CreateTask {
+                            task: task.clone(),
+                        });
                         self.data.events.push(task);
                     } else {
-                        // Update existing task
+                        // Track task edit
                         if let Some(existing) = self.data.events.iter_mut().find(|t| Some(&t.id) == new_state.task_id.as_ref()) {
-                            *existing = task;
+                            let old_task = existing.clone();
+                            *existing = task.clone();
+                            
+                            self.undo_stack.push(Operation::EditTask {
+                                task_id: task.id.clone(),
+                                old_task,
+                                new_task: task,
+                            });
                         }
                     }
                     self.mode = AppMode::Normal;
                     self.save()?;
                 } else {
                     self.mode = AppMode::TaskEdit(new_state);
-                }
-            }
-            AppMode::ConfirmDelete(task_id) => {
-                match key.code {
-                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                        // Store the date before deletion for cursor restoration
-                        let task_date = self.data.events.iter()
-                            .find(|t| &t.id == task_id)
-                            .map(|t| t.start.date_naive());
-                        
-                        // Delete the task
-                        self.data.events.retain(|t| &t.id != task_id);
-                        
-                        // Check if there are any remaining tasks on the same date
-                        if let Some(date) = task_date {
-                            let remaining_tasks: Vec<_> = self.data.events.iter()
-                                .filter(|t| t.is_on_date(date))
-                                .collect();
-                            
-                            if remaining_tasks.is_empty() {
-                                // No more tasks on this day, select the day itself
-                                self.month_view.selection = month_view::Selection {
-                                    selection_type: month_view::SelectionType::Day(date),
-                                    task_index_in_day: None,
-                                };
-                            } else {
-                                // Select the first remaining task
-                                self.month_view.selection = month_view::Selection {
-                                    selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
-                                    task_index_in_day: Some(0),
-                                };
-                            }
-                        }
-                        
-                        self.mode = AppMode::Normal;
-                        self.save()?;
-                    }
-                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                        self.mode = AppMode::Normal;
-                    }
-                    _ => {}
                 }
             }
         }
@@ -165,8 +138,88 @@ impl App {
                 }
             }
             KeyCode::Char('x') => {
+                // Immediately delete the selected task
                 if let Some(task_id) = self.month_view.get_selected_task_id() {
-                    self.mode = AppMode::ConfirmDelete(task_id);
+                    if let Some(task_index) = self.data.events.iter().position(|t| t.id == task_id) {
+                        let deleted_task = self.data.events.remove(task_index);
+                        let task_date = deleted_task.start.date_naive();
+                        
+                        // Track deletion for undo functionality
+                        self.undo_stack.push(Operation::DeleteTask {
+                            task: deleted_task,
+                            original_date: task_date,
+                        });
+                        
+                        // Check if there are any remaining tasks on the same date
+                        let remaining_tasks: Vec<_> = self.data.events.iter()
+                            .filter(|t| t.is_on_date(task_date))
+                            .collect();
+                        
+                        if remaining_tasks.is_empty() {
+                            // No more tasks on this day, select the day itself
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Day(task_date),
+                                task_index_in_day: None,
+                            };
+                        } else {
+                            // Select the first remaining task
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
+                                task_index_in_day: Some(0),
+                            };
+                        }
+                        
+                        self.save()?;
+                    }
+                }
+            }
+            KeyCode::Char('u') => {
+                // Undo last operation
+                if let Some(operation) = self.undo_stack.pop() {
+                    match operation {
+                        Operation::DeleteTask { task, original_date } => {
+                            // Restore deleted task
+                            self.data.events.push(task.clone());
+                            
+                            // Select the restored task
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Task(task.id),
+                                task_index_in_day: Some(0),
+                            };
+                        }
+                        Operation::EditTask { task_id, old_task, new_task: _ } => {
+                            // Revert task edit
+                            if let Some(existing) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                                *existing = old_task;
+                            }
+                        }
+                        Operation::CreateTask { task } => {
+                            // Remove created task
+                            self.data.events.retain(|t| t.id != task.id);
+                            
+                            // Select the day where the task was
+                            let task_date = task.start.date_naive();
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Day(task_date),
+                                task_index_in_day: None,
+                            };
+                        }
+                        Operation::YankPaste { task_id, old_date, new_date } => {
+                            // TODO: Implement when yank/paste is added
+                            // For now, we'll revert the task to its old date
+                            if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
+                                let duration = task.end - task.start;
+                                let old_datetime = old_date.and_hms_opt(
+                                    task.start.time().hour(),
+                                    task.start.time().minute(),
+                                    task.start.time().second()
+                                ).unwrap().and_utc();
+                                task.start = old_datetime;
+                                task.end = old_datetime + duration;
+                            }
+                        }
+                    }
+                    self.save()?;
                 }
             }
             KeyCode::Char('c') => {
@@ -266,9 +319,6 @@ impl App {
             AppMode::TaskEdit(state) => {
                 render_task_edit_popup(frame, area, state);
             }
-            AppMode::ConfirmDelete(_) => {
-                self.render_delete_confirmation(frame, area);
-            }
             AppMode::Normal => {}
         }
     }
@@ -284,24 +334,35 @@ impl App {
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
         let help_text = match &self.mode {
             AppMode::Normal => {
-                vec![
-                    Line::from(vec![
-                        Span::styled("hjkl", Style::default().fg(Color::Green)),
-                        Span::raw(": Move | "),
-                        Span::styled("i", Style::default().fg(Color::Green)),
-                        Span::raw(": Insert/Edit | "),
-                        Span::styled("x", Style::default().fg(Color::Red)),
-                        Span::raw(": Delete | "),
-                        Span::styled("c", Style::default().fg(Color::Blue)),
-                        Span::raw(": Toggle Complete | "),
-                        Span::styled("n/p", Style::default().fg(Color::Yellow)),
-                        Span::raw(": Month | "),
-                        Span::styled("N/P", Style::default().fg(Color::Yellow)),
-                        Span::raw(": Year | "),
-                        Span::styled("q", Style::default().fg(Color::Red)),
-                        Span::raw(": Quit"),
-                    ])
-                ]
+                let mut spans = vec![
+                    Span::styled("hjkl", Style::default().fg(Color::Green)),
+                    Span::raw(": Move | "),
+                    Span::styled("i", Style::default().fg(Color::Green)),
+                    Span::raw(": Insert/Edit | "),
+                    Span::styled("x", Style::default().fg(Color::Red)),
+                    Span::raw(": Delete | "),
+                ];
+                
+                // Add undo option if there are operations to undo
+                if !self.undo_stack.is_empty() {
+                    spans.extend(vec![
+                        Span::styled("u", Style::default().fg(Color::Yellow)),
+                        Span::raw(": Undo | "),
+                    ]);
+                }
+                
+                spans.extend(vec![
+                    Span::styled("c", Style::default().fg(Color::Blue)),
+                    Span::raw(": Toggle Complete | "),
+                    Span::styled("n/p", Style::default().fg(Color::Yellow)),
+                    Span::raw(": Month | "),
+                    Span::styled("N/P", Style::default().fg(Color::Yellow)),
+                    Span::raw(": Year | "),
+                    Span::styled("q", Style::default().fg(Color::Red)),
+                    Span::raw(": Quit"),
+                ]);
+                
+                vec![Line::from(spans)]
             }
             AppMode::TaskEdit(_) => {
                 vec![
@@ -315,71 +376,12 @@ impl App {
                     ])
                 ]
             }
-            AppMode::ConfirmDelete(_) => {
-                vec![
-                    Line::from(vec![
-                        Span::styled("y", Style::default().fg(Color::Red)),
-                        Span::raw(": Yes, delete | "),
-                        Span::styled("n", Style::default().fg(Color::Green)),
-                        Span::raw(": No, cancel | "),
-                        Span::styled("Esc", Style::default().fg(Color::Gray)),
-                        Span::raw(": Cancel"),
-                    ])
-                ]
-            }
         };
         
         let footer = Paragraph::new(help_text)
             .style(Style::default().fg(Color::Gray));
         frame.render_widget(footer, area);
     }
-    
-    fn render_delete_confirmation(&self, frame: &mut Frame, area: Rect) {
-        // Calculate popup area (centered, 40% width, 20% height)
-        let popup_area = centered_rect(40, 20, area);
-        
-        // Clear the area
-        frame.render_widget(ratatui::widgets::Clear, popup_area);
-        
-        let block = Block::default()
-            .title("Delete Task")
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Red).bg(Color::Black));
-        
-        let inner_area = block.inner(popup_area);
-        frame.render_widget(block, popup_area);
-        
-        let text = vec![
-            Line::from("Are you sure you want to delete this task?"),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("y", Style::default().fg(Color::Red)),
-                Span::raw(": Yes | "),
-                Span::styled("n", Style::default().fg(Color::Green)),
-                Span::raw(": No"),
-            ]),
-        ];
-        
-        let paragraph = Paragraph::new(text)
-            .style(Style::default().fg(Color::White));
-        
-        frame.render_widget(paragraph, inner_area);
-    }
-}
-
-// Helper function to create a centered rectangle
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ]).split(r);
-    
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ]).split(popup_layout[1])[1]
 }
 
 fn main() -> Result<()> {
