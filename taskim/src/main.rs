@@ -5,7 +5,6 @@ mod month_view;
 mod config;
 mod undo;
 mod utils;
-mod row_expansion_tests;
 
 use crate::month_view::{MonthView, render_month_view, SelectionType};
 use crate::task::TaskData;
@@ -587,7 +586,7 @@ impl App {
         self.render_header(frame, layout[0]);
         
         // Render main content
-        render_month_view(frame, layout[1], &self.month_view, &self.data.events, &self.data.weekly_goals);
+        render_month_view(frame, layout[1], &self.month_view, &self.data.events);
         
         // Render footer
         self.render_footer(frame, layout[2]);

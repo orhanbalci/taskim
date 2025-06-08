@@ -21,8 +21,6 @@ pub struct TaskComment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskData {
     pub events: Vec<Task>,
-    #[serde(rename = "weeklyGoals")]
-    pub weekly_goals: std::collections::HashMap<String, String>,
 }
 
 impl Task {
@@ -58,7 +56,6 @@ impl Default for TaskData {
     fn default() -> Self {
         Self {
             events: vec![],
-            weekly_goals: std::collections::HashMap::new(),
         }
     }
 }

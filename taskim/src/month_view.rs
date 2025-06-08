@@ -7,7 +7,6 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SelectionType {
@@ -374,7 +373,6 @@ pub fn render_month_view(
     area: Rect,
     month_view: &MonthView,
     tasks: &[Task],
-    _weekly_goals: &HashMap<String, String>,
 ) {
     let title = format!(
         "{} {}",
@@ -416,7 +414,7 @@ pub fn render_month_view(
         
         let week_area = week_layout[week_index];
         
-        // NO MORE GOAL SPLIT - just render days directly
+        // Render days directly
         let day_constraints: Vec<Constraint> = (0..7)
             .map(|_| Constraint::Percentage(100 / 7))
             .collect();
