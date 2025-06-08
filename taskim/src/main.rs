@@ -19,24 +19,9 @@ use ratatui::{
     layout::{Constraint, Layout, Rect, Position},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Clear},
+    widgets::{Block, Borders, Paragraph},
     DefaultTerminal, Frame,
 };
-
-// Helper function to create a centered rectangle
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ]).split(r);
-    
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ]).split(popup_layout[1])[1]
-}
 
 #[derive(Debug, Clone, PartialEq)]
 enum AppMode {
@@ -49,6 +34,7 @@ enum AppMode {
 struct CommandState {
     input: String,
     cursor_position: usize,
+    show_help: bool,
 }
 
 impl CommandState {
@@ -56,6 +42,7 @@ impl CommandState {
         Self {
             input: String::new(),
             cursor_position: 0,
+            show_help: false,
         }
     }
     
@@ -448,15 +435,30 @@ impl App {
             }
             KeyCode::Enter => {
                 // Execute command
-                if let Err(e) = self.execute_command(&state.input) {
-                    // For now, just return to normal mode on any error
-                    // TODO: Add error display
-                    eprintln!("Command error: {}", e);
+                let command = state.input.trim();
+                
+                if command == "help" {
+                    // Toggle help display
+                    state.show_help = !state.show_help;
+                    state.input.clear();
+                    state.cursor_position = 0;
+                    return Ok(false); // Stay in command mode to show help
+                } else if !command.is_empty() {
+                    if let Err(e) = self.execute_command(&state.input) {
+                        // For now, just return to normal mode on any error
+                        // TODO: Add error display
+                        eprintln!("Command error: {}", e);
+                    }
+                    return Ok(true);
+                } else {
+                    // Empty command, just exit
+                    return Ok(true);
                 }
-                return Ok(true);
             }
             KeyCode::Backspace => {
                 state.remove_char();
+                // Hide help when user starts typing
+                state.show_help = false;
             }
             KeyCode::Left => {
                 state.move_cursor_left();
@@ -466,6 +468,8 @@ impl App {
             }
             KeyCode::Char(ch) => {
                 state.add_char(ch);
+                // Hide help when user starts typing
+                state.show_help = false;
             }
             _ => {}
         }
@@ -476,6 +480,13 @@ impl App {
         let trimmed = command.trim();
         
         if trimmed.is_empty() {
+            return Ok(());
+        }
+        
+        // Handle help command
+        if trimmed == "help" {
+            // Show help in footer by temporarily switching modes - we'll handle this differently
+            // For now, just return Ok since help is shown in the UI
             return Ok(());
         }
         
@@ -495,7 +506,7 @@ impl App {
             return Ok(());
         }
         
-        Err(color_eyre::eyre::eyre!("Unknown command: {}", trimmed))
+        Err(color_eyre::eyre::eyre!("Unknown command: {}. Type ':help' for available commands.", trimmed))
     }
     
     fn parse_date_command(&self, input: &str) -> Option<chrono::NaiveDate> {
@@ -575,11 +586,16 @@ impl App {
     fn render(&self, frame: &mut Frame) {
         let area = frame.area();
         
-        // Create main layout
+        // Create main layout - adjust footer size based on command mode
+        let footer_height = match &self.mode {
+            AppMode::Command(state) if state.show_help => 6, // More space for help
+            _ => 2, // Normal footer size
+        };
+        
         let layout = Layout::vertical([
-            Constraint::Length(3), // Header
-            Constraint::Min(0),    // Main content
-            Constraint::Length(2), // Footer
+            Constraint::Length(3),           // Header
+            Constraint::Min(0),              // Main content
+            Constraint::Length(footer_height), // Footer
         ]).split(area);
         
         // Render header
@@ -596,8 +612,8 @@ impl App {
             AppMode::TaskEdit(state) => {
                 render_task_edit_popup(frame, area, state);
             }
-            AppMode::Command(state) => {
-                self.render_command_popup(frame, area, state);
+            AppMode::Command(_) => {
+                // Command mode is handled in the footer
             }
             AppMode::Normal => {}
         }
@@ -612,82 +628,69 @@ impl App {
     }
     
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
-        let help_text = match &self.mode {
+        match &self.mode {
+            AppMode::Command(state) => {
+                if state.show_help {
+                    // Show help information
+                    let help_lines = vec![
+                        Line::from(vec![
+                            Span::styled("Date Navigation Commands:", Style::default().fg(Color::Yellow)),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("YYYY", Style::default().fg(Color::Green)),
+                            Span::raw(" - Go to year (e.g., 2024)"),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("MM/DD/YYYY", Style::default().fg(Color::Green)),
+                            Span::raw(" - Go to specific date (e.g., 06/15/2024)"),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("DD", Style::default().fg(Color::Green)),
+                            Span::raw(" - Go to day in current month (e.g., 15)"),
+                        ]),
+                        Line::from(vec![
+                            Span::styled(":help", Style::default().fg(Color::Cyan)),
+                            Span::raw(" - Toggle this help | "),
+                            Span::styled("Esc", Style::default().fg(Color::Red)),
+                            Span::raw(" - Exit command mode"),
+                        ]),
+                    ];
+                    
+                    let help_paragraph = Paragraph::new(help_lines)
+                        .style(Style::default().fg(Color::White).bg(Color::Black));
+                    frame.render_widget(help_paragraph, area);
+                } else {
+                    // Render command line like vim
+                    let command_line = format!(":{}", state.input);
+                    let command_paragraph = Paragraph::new(command_line.as_str())
+                        .style(Style::default().fg(Color::White).bg(Color::Black));
+                    frame.render_widget(command_paragraph, area);
+                    
+                    // Set cursor position at the end of the command
+                    frame.set_cursor_position(Position::new(
+                        area.x + 1 + state.cursor_position as u16, // +1 for the ':' character
+                        area.y
+                    ));
+                }
+            }
             AppMode::Normal => {
                 let spans = KEYBINDINGS.get_normal_mode_help_spans(
                     self.undo_stack.can_undo(),
                     self.undo_stack.can_redo()
                 );
-                vec![Line::from(spans)]
+                let help_text = vec![Line::from(spans)];
+                let footer = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::Gray));
+                frame.render_widget(footer, area);
             }
             AppMode::TaskEdit(_) => {
                 let spans = KEYBINDINGS.get_edit_mode_help_spans();
-                vec![Line::from(spans)]
+                let help_text = vec![Line::from(spans)];
+                let footer = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::Gray));
+                frame.render_widget(footer, area);
             }
-            AppMode::Command(_) => {
-                vec![Line::from("Command mode: Type date (YYYY, MM/DD/YYYY, DD) | Enter: execute | Esc: cancel")]
-            }
-        };
-        
-        let footer = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::Gray));
-        frame.render_widget(footer, area);
-    }
-    
-    fn render_command_popup(&self, frame: &mut Frame, area: Rect, state: &CommandState) {
-        // Create centered popup area
-        let popup_area = centered_rect(50, 20, area);
-        
-        // Clear the area
-        frame.render_widget(Clear, popup_area);
-        
-        // Create the block
-        let block = Block::default()
-            .title("Command Mode")
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Yellow).bg(Color::Black));
-        
-        let inner_area = block.inner(popup_area);
-        frame.render_widget(block, popup_area);
-        
-        // Split the inner area for input and instructions
-        let layout = Layout::vertical([
-            Constraint::Length(1), // Input field
-            Constraint::Length(2), // Instructions
-        ]).split(inner_area);
-        
-        // Render input field
-        let input_paragraph = Paragraph::new(state.input.as_str())
-            .style(Style::default().fg(Color::White));
-        frame.render_widget(input_paragraph, layout[0]);
-        
-        // Render instructions
-        let instructions = vec![
-            Line::from(vec![
-                Span::raw("Enter date: "),
-                Span::styled("YYYY", Style::default().fg(Color::Green)),
-                Span::raw(", "),
-                Span::styled("MM/DD/YYYY", Style::default().fg(Color::Green)),
-                Span::raw(", or "),
-                Span::styled("DD", Style::default().fg(Color::Green)),
-            ]),
-            Line::from(vec![
-                Span::styled("Enter", Style::default().fg(Color::Green)),
-                Span::raw(": Execute | "),
-                Span::styled("Esc", Style::default().fg(Color::Red)),
-                Span::raw(": Cancel"),
-            ])
-        ];
-        
-        let instructions_paragraph = Paragraph::new(instructions)
-            .style(Style::default().fg(Color::Gray));
-        frame.render_widget(instructions_paragraph, layout[1]);
-        
-        // Set cursor position
-        frame.set_cursor_position(Position::new(
-            layout[0].x + state.cursor_position as u16,
-            layout[0].y
-        ));
+        }
     }
 }
 
