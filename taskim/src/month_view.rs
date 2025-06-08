@@ -374,7 +374,19 @@ pub fn render_month_view(
     month_view: &MonthView,
     tasks: &[Task],
 ) {
-    let inner_area = area;
+    let title = format!(
+        "{} {}",
+        month_view.current_date.format("%B"),
+        month_view.current_date.year()
+    );
+    
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White).bg(Color::Black));
+    
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
     
     // DRASTICALLY SIMPLIFIED: Calculate constraints for each week based on max tasks ONLY
     let week_constraints: Vec<Constraint> = month_view.weeks.iter()
