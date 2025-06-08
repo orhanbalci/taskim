@@ -51,6 +51,9 @@ pub struct Config {
     pub first_day_of_month: KeyBinding,
     pub last_day_of_month: KeyBinding,
     
+    // Go to today
+    pub go_to_today: KeyBinding,
+    
     // Task editing
     pub save_task: KeyBinding,
     pub cancel_edit: KeyBinding,
@@ -100,6 +103,9 @@ pub const KEYBINDINGS: Config = Config {
     // Day navigation (vim-style)
     first_day_of_month: KeyBinding { key: KeyCode::Char('0'), modifiers: KeyModifiers::NONE, description: "First Day", color: Color::Blue },
     last_day_of_month: KeyBinding { key: KeyCode::Char('$'), modifiers: KeyModifiers::SHIFT, description: "Last Day", color: Color::Blue },
+    
+    // Go to today
+    go_to_today: KeyBinding { key: KeyCode::Char('t'), modifiers: KeyModifiers::NONE, description: "Go to Today", color: Color::Magenta },
     
     // Task editing
     save_task: KeyBinding { key: KeyCode::Enter, modifiers: KeyModifiers::NONE, description: "Save", color: Color::Green },

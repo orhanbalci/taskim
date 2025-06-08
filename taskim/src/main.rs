@@ -12,21 +12,79 @@ use crate::data::{load_data, save_data};
 use crate::undo::{UndoStack, Operation};
 use crate::config::KEYBINDINGS;
 
-use chrono::{Local, Timelike};
+use chrono::{Local, Timelike, Datelike};
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Rect, Position},
     style::{Color, Style},
-    text::Line,
-    widgets::{Block, Borders, Paragraph},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Clear},
     DefaultTerminal, Frame,
 };
+
+// Helper function to create a centered rectangle
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::vertical([
+        Constraint::Percentage((100 - percent_y) / 2),
+        Constraint::Percentage(percent_y),
+        Constraint::Percentage((100 - percent_y) / 2),
+    ]).split(r);
+    
+    Layout::horizontal([
+        Constraint::Percentage((100 - percent_x) / 2),
+        Constraint::Percentage(percent_x),
+        Constraint::Percentage((100 - percent_x) / 2),
+    ]).split(popup_layout[1])[1]
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum AppMode {
     Normal,
     TaskEdit(TaskEditState),
+    Command(CommandState),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct CommandState {
+    input: String,
+    cursor_position: usize,
+}
+
+impl CommandState {
+    fn new() -> Self {
+        Self {
+            input: String::new(),
+            cursor_position: 0,
+        }
+    }
+    
+    fn add_char(&mut self, ch: char) {
+        self.input.insert(self.cursor_position, ch);
+        self.cursor_position += 1;
+    }
+    
+    fn remove_char(&mut self) {
+        if self.cursor_position > 0 {
+            self.cursor_position -= 1;
+            self.input.remove(self.cursor_position);
+        }
+    }
+    
+    fn move_cursor_left(&mut self) {
+        self.cursor_position = self.cursor_position.saturating_sub(1);
+    }
+    
+    fn move_cursor_right(&mut self) {
+        if self.cursor_position < self.input.len() {
+            self.cursor_position += 1;
+        }
+    }
+    
+    fn clear(&mut self) {
+        self.input.clear();
+        self.cursor_position = 0;
+    }
 }
 
 struct App {
@@ -36,6 +94,7 @@ struct App {
     should_exit: bool,
     undo_stack: UndoStack,
     yanked_task: Option<crate::task::Task>, // Store yanked task for paste operation
+    pending_key: Option<char>, // For handling multi-key sequences like 'gg'
 }
 
 impl App {
@@ -51,6 +110,7 @@ impl App {
             should_exit: false,
             undo_stack: UndoStack::new(50), // Allow up to 50 undo operations
             yanked_task: None,
+            pending_key: None,
         }
     }
     
@@ -62,6 +122,15 @@ impl App {
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<()> {
         match &self.mode {
             AppMode::Normal => self.handle_normal_mode_key(key)?,
+            AppMode::Command(state) => {
+                let mut new_state = state.clone();
+                if self.handle_command_mode_key(key, &mut new_state)? {
+                    // Command completed or cancelled
+                    self.mode = AppMode::Normal;
+                } else {
+                    self.mode = AppMode::Command(new_state);
+                }
+            }
             AppMode::TaskEdit(state) => {
                 let mut new_state = state.clone();
                 if self.handle_task_edit_key(key, &mut new_state)? {
@@ -101,6 +170,18 @@ impl App {
         if KEYBINDINGS.force_quit.matches(key.code, key.modifiers) {
             self.should_exit = true;
             return Ok(());
+        }
+        
+        // Handle multi-key sequences first
+        if let Some(pending) = self.pending_key {
+            if pending == 'g' && key.code == KeyCode::Char('g') && key.modifiers == KeyModifiers::NONE {
+                // Handle 'gg' - go to first year
+                self.month_view.first_year();
+                self.pending_key = None;
+                return Ok(());
+            }
+            // If we have a pending key but don't match, clear it and continue with normal processing
+            self.pending_key = None;
         }
         
         if KEYBINDINGS.quit.matches(key.code, key.modifiers) || 
@@ -306,17 +387,20 @@ impl App {
                 self.save()?;
             }
         } else if KEYBINDINGS.next_month.matches(key.code, key.modifiers) {
-            // Next month (vim-style: L)
-            self.month_view.next_month();
+            // Next month (vim-style: L) - preserve day
+            self.month_view.next_month_preserve_day();
         } else if KEYBINDINGS.prev_month.matches(key.code, key.modifiers) {
-            // Previous month (vim-style: H)
-            self.month_view.prev_month();
+            // Previous month (vim-style: H) - preserve day
+            self.month_view.prev_month_preserve_day();
         } else if KEYBINDINGS.next_year.matches(key.code, key.modifiers) {
-            // Next/Last year (vim-style: G)
-            self.month_view.next_year();
+            // Next/Last year (vim-style: G) - go to last year
+            self.month_view.last_year();
         } else if KEYBINDINGS.prev_year.matches(key.code, key.modifiers) {
-            // Previous/First year (vim-style: gg)
-            self.month_view.prev_year();
+            // Handle first 'g' for 'gg' sequence
+            self.pending_key = Some('g');
+        } else if KEYBINDINGS.go_to_today.matches(key.code, key.modifiers) {
+            // Go to today (vim-style: t)
+            self.month_view.go_to_today();
         } else if KEYBINDINGS.next_week.matches(key.code, key.modifiers) {
             // Next week (vim-style: w)
             self.month_view.next_week();
@@ -326,9 +410,13 @@ impl App {
         } else if KEYBINDINGS.first_day_of_month.matches(key.code, key.modifiers) {
             // First day of month (vim-style: 0)
             self.month_view.first_day_of_month();
-        } else if KEYBINDINGS.last_day_of_month.matches(key.code, key.modifiers) {
-            // Last day of month (vim-style: $)
+        } else if KEYBINDINGS.last_day_of_month.matches(key.code, key.modifiers) ||
+                  (key.code == KeyCode::Char('$') && key.modifiers == KeyModifiers::NONE) {
+            // Last day of month (vim-style: $) - handle both shift+4 and direct $
             self.month_view.last_day_of_month();
+        } else if key.code == KeyCode::Char(':') && key.modifiers == KeyModifiers::NONE {
+            // Enter command mode (vim-style: :)
+            self.mode = AppMode::Command(CommandState::new());
         }
         Ok(())
     }
@@ -350,6 +438,121 @@ impl App {
             state.add_char(ch);
         }
         Ok(false)
+    }
+    
+    fn handle_command_mode_key(&mut self, key: crossterm::event::KeyEvent, state: &mut CommandState) -> Result<bool> {
+        match key.code {
+            KeyCode::Esc => {
+                // Cancel command mode
+                return Ok(true);
+            }
+            KeyCode::Enter => {
+                // Execute command
+                if let Err(e) = self.execute_command(&state.input) {
+                    // For now, just return to normal mode on any error
+                    // TODO: Add error display
+                    eprintln!("Command error: {}", e);
+                }
+                return Ok(true);
+            }
+            KeyCode::Backspace => {
+                state.remove_char();
+            }
+            KeyCode::Left => {
+                state.move_cursor_left();
+            }
+            KeyCode::Right => {
+                state.move_cursor_right();
+            }
+            KeyCode::Char(ch) => {
+                state.add_char(ch);
+            }
+            _ => {}
+        }
+        Ok(false)
+    }
+    
+    fn execute_command(&mut self, command: &str) -> Result<()> {
+        let trimmed = command.trim();
+        
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+        
+        // Try to parse as a date in various formats
+        if let Some(date) = self.parse_date_command(trimmed) {
+            // Navigate to the specified date using the existing methods
+            if date.month() != self.month_view.current_date.month() || date.year() != self.month_view.current_date.year() {
+                self.month_view.current_date = date.with_day(1).unwrap();
+                self.month_view.weeks = MonthView::build_weeks_for_date(self.month_view.current_date);
+            }
+            
+            self.month_view.selection = month_view::Selection {
+                selection_type: month_view::SelectionType::Day(date),
+                task_index_in_day: None,
+            };
+            
+            return Ok(());
+        }
+        
+        Err(color_eyre::eyre::eyre!("Unknown command: {}", trimmed))
+    }
+    
+    fn parse_date_command(&self, input: &str) -> Option<chrono::NaiveDate> {
+        use chrono::NaiveDate;
+        
+        // Try parsing as YYYY (year only)
+        if let Ok(year) = input.parse::<i32>() {
+            if year >= 1900 && year <= 2050 {
+                let current_month = self.month_view.current_date.month();
+                let current_day = self.month_view.get_selected_date().day();
+                
+                // Calculate days in the target month for the specified year
+                let days_in_month = match current_month {
+                    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                    4 | 6 | 9 | 11 => 30,
+                    2 => if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) { 29 } else { 28 },
+                    _ => 31,
+                };
+                
+                let safe_day = std::cmp::min(current_day, days_in_month);
+                return NaiveDate::from_ymd_opt(year, current_month, safe_day);
+            }
+        }
+        
+        // Try parsing as MM/DD/YYYY (simple manual parsing)
+        let parts: Vec<&str> = input.split('/').collect();
+        if parts.len() == 3 {
+            if let (Ok(month), Ok(day), Ok(year)) = (
+                parts[0].parse::<u32>(),
+                parts[1].parse::<u32>(),
+                parts[2].parse::<i32>(),
+            ) {
+                return NaiveDate::from_ymd_opt(year, month, day);
+            }
+        }
+        
+        // Try parsing as DD (day only)
+        if let Ok(day) = input.parse::<u32>() {
+            if day >= 1 && day <= 31 {
+                let current_year = self.month_view.current_date.year();
+                let current_month = self.month_view.current_date.month();
+                
+                // Check if the day is valid for the current month
+                let days_in_month = match current_month {
+                    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                    4 | 6 | 9 | 11 => 30,
+                    2 => if current_year % 4 == 0 && (current_year % 100 != 0 || current_year % 400 == 0) { 29 } else { 28 },
+                    _ => 31,
+                };
+                
+                if day <= days_in_month {
+                    return NaiveDate::from_ymd_opt(current_year, current_month, day);
+                }
+            }
+        }
+        
+        None
     }
     
     fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
@@ -393,6 +596,9 @@ impl App {
             AppMode::TaskEdit(state) => {
                 render_task_edit_popup(frame, area, state);
             }
+            AppMode::Command(state) => {
+                self.render_command_popup(frame, area, state);
+            }
             AppMode::Normal => {}
         }
     }
@@ -418,11 +624,70 @@ impl App {
                 let spans = KEYBINDINGS.get_edit_mode_help_spans();
                 vec![Line::from(spans)]
             }
+            AppMode::Command(_) => {
+                vec![Line::from("Command mode: Type date (YYYY, MM/DD/YYYY, DD) | Enter: execute | Esc: cancel")]
+            }
         };
         
         let footer = Paragraph::new(help_text)
             .style(Style::default().fg(Color::Gray));
         frame.render_widget(footer, area);
+    }
+    
+    fn render_command_popup(&self, frame: &mut Frame, area: Rect, state: &CommandState) {
+        // Create centered popup area
+        let popup_area = centered_rect(50, 20, area);
+        
+        // Clear the area
+        frame.render_widget(Clear, popup_area);
+        
+        // Create the block
+        let block = Block::default()
+            .title("Command Mode")
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::Yellow).bg(Color::Black));
+        
+        let inner_area = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+        
+        // Split the inner area for input and instructions
+        let layout = Layout::vertical([
+            Constraint::Length(1), // Input field
+            Constraint::Length(2), // Instructions
+        ]).split(inner_area);
+        
+        // Render input field
+        let input_paragraph = Paragraph::new(state.input.as_str())
+            .style(Style::default().fg(Color::White));
+        frame.render_widget(input_paragraph, layout[0]);
+        
+        // Render instructions
+        let instructions = vec![
+            Line::from(vec![
+                Span::raw("Enter date: "),
+                Span::styled("YYYY", Style::default().fg(Color::Green)),
+                Span::raw(", "),
+                Span::styled("MM/DD/YYYY", Style::default().fg(Color::Green)),
+                Span::raw(", or "),
+                Span::styled("DD", Style::default().fg(Color::Green)),
+            ]),
+            Line::from(vec![
+                Span::styled("Enter", Style::default().fg(Color::Green)),
+                Span::raw(": Execute | "),
+                Span::styled("Esc", Style::default().fg(Color::Red)),
+                Span::raw(": Cancel"),
+            ])
+        ];
+        
+        let instructions_paragraph = Paragraph::new(instructions)
+            .style(Style::default().fg(Color::Gray));
+        frame.render_widget(instructions_paragraph, layout[1]);
+        
+        // Set cursor position
+        frame.set_cursor_position(Position::new(
+            layout[0].x + state.cursor_position as u16,
+            layout[0].y
+        ));
     }
 }
 
