@@ -1,10 +1,11 @@
 mod task;
-mod month_view;
 mod task_edit;
 mod data;
-mod undo;
+mod month_view;
 mod config;
+mod undo;
 mod utils;
+mod row_expansion_tests;
 
 use crate::month_view::{MonthView, render_month_view, SelectionType};
 use crate::task::TaskData;
@@ -192,9 +193,6 @@ impl App {
                         let edit_state = TaskEditState::edit_task(task);
                         self.mode = AppMode::TaskEdit(edit_state);
                     }
-                }
-                SelectionType::WeekGoal(_) => {
-                    // TODO: Edit weekly goal
                 }
             }
         } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {

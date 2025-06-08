@@ -13,8 +13,6 @@ use std::collections::HashMap;
 pub enum SelectionType {
     Day(NaiveDate),
     Task(String), // task id
-    #[allow(dead_code)]
-    WeekGoal(String), // week key
 }
 
 #[derive(Debug, Clone)]
@@ -144,12 +142,6 @@ impl MonthView {
         self.transition_to_month(new_date);
     }
     
-    fn get_week_key(date: NaiveDate) -> String {
-        let year = date.year();
-        let week = date.iso_week().week();
-        format!("{:04}-{:02}", year, week)
-    }
-    
     pub fn move_up(&mut self, tasks: &[Task]) {
         match &self.selection.selection_type {
             SelectionType::Day(date) => {
@@ -189,10 +181,6 @@ impl MonthView {
                         }
                     }
                 }
-            }
-            SelectionType::WeekGoal(_) => {
-                // Move from week goal to the day above it
-                // This would be the last day of the previous week
             }
         }
     }
@@ -234,9 +222,6 @@ impl MonthView {
                     }
                 }
             }
-            SelectionType::WeekGoal(_) => {
-                // Move to next week goal
-            }
         }
     }
     
@@ -253,9 +238,6 @@ impl MonthView {
                     let task_date = task.start.date_naive();
                     self.select_day(task_date);
                 }
-            }
-            SelectionType::WeekGoal(_) => {
-                // Stay on week goal
             }
         }
     }
@@ -274,9 +256,6 @@ impl MonthView {
                     self.select_day(task_date);
                 }
             }
-            SelectionType::WeekGoal(_) => {
-                // Stay on week goal
-            }
         }
     }
     
@@ -292,11 +271,20 @@ impl MonthView {
         match &self.selection.selection_type {
             SelectionType::Day(date) => *date,
             SelectionType::Task(_task_id) => {
-                // If a task is selected, return the current date as fallback
-                // In a real implementation, you might want to find the task's date
+                // For task selection, we need to search the weeks to find the task's date
+                // This is a fallback approach since we don't have direct task access
+                // In practice, when a task is selected, the UI should maintain the correct date
+                for week in &self.weeks {
+                    for &date in week {
+                        // This is a simplified approach - in a real implementation,
+                        // we'd need access to the task list to find the actual task date
+                        if date.month() == self.current_date.month() {
+                            return date;
+                        }
+                    }
+                }
                 self.current_date
             }
-            SelectionType::WeekGoal(_) => self.current_date,
         }
     }
 
@@ -386,7 +374,7 @@ pub fn render_month_view(
     area: Rect,
     month_view: &MonthView,
     tasks: &[Task],
-    weekly_goals: &HashMap<String, String>,
+    _weekly_goals: &HashMap<String, String>,
 ) {
     let title = format!(
         "{} {}",
@@ -402,29 +390,20 @@ pub fn render_month_view(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    // Calculate constraints for each week individually based on max tasks in that week
+    // DRASTICALLY SIMPLIFIED: Calculate constraints for each week based on max tasks ONLY
     let week_constraints: Vec<Constraint> = month_view.weeks.iter()
         .map(|week| {
-            // Calculate max tasks for this specific week
+            // Find the maximum number of tasks in any day of this week
             let max_tasks_in_week = week.iter()
-                .map(|&date| {
-                    let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
-                    day_tasks.len()
-                })
+                .map(|&date| tasks.iter().filter(|t| t.is_on_date(date)).count())
                 .max()
                 .unwrap_or(0);
             
-            // Each week needs:
-            // - 1 row for weekly goal
-            // - Minimum 4 rows for day cells (1 for day number + 3 minimum for tasks/spacing)
-            // - Additional rows for tasks (unlimited expansion based on actual task count in this week)
-            let minimum_week_height = 5; // goal (1) + minimum day cell height (4 lines minimum)
-            let base_week_height = 2; // goal + day number base
-            let additional_task_rows = max_tasks_in_week; // Unlimited expansion based on actual tasks
-            let calculated_height = base_week_height + additional_task_rows.max(2); // Ensure at least 2 rows for tasks
-            let week_height = calculated_height.max(minimum_week_height); // Enforce absolute minimum
+            // CORRECTED: Day number + tasks (not replacing each other) + more space for borders
+            let week_height = 1 + max_tasks_in_week + 2; // day_number(1) + tasks(N) + borders+padding(2)  
+            let min_height = 4; // Minimum: day_number(1) + borders(2) + some_space(1)
             
-            Constraint::Length(week_height as u16)
+            Constraint::Length(week_height.max(min_height) as u16)
         })
         .collect();
     
@@ -437,49 +416,12 @@ pub fn render_month_view(
         
         let week_area = week_layout[week_index];
         
-        // Calculate the height for this specific week (recalculate to match constraint logic)
-        let max_tasks_in_week = week.iter()
-            .map(|&date| {
-                let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
-                day_tasks.len()
-            })
-            .max()
-            .unwrap_or(0);
-        let minimum_week_height = 5;
-        let base_week_height = 2;
-        let additional_task_rows = max_tasks_in_week;
-        let calculated_height = base_week_height + additional_task_rows.max(2);
-        let calculated_week_height = calculated_height.max(minimum_week_height);
-        
-        // Split week area into goal row and day row
-        let week_split = Layout::vertical([
-            Constraint::Length(1), 
-            Constraint::Length((calculated_week_height.saturating_sub(1)).max(4) as u16) // Ensure minimum 4 lines for day cells
-        ]).split(week_area);
-        
-        let goal_area = week_split[0];
-        let day_area = week_split[1];
-        
-        // Render weekly goal
-        let week_key = MonthView::get_week_key(week[0]);
-        let goal_text = weekly_goals.get(&week_key).cloned().unwrap_or_default();
-        let goal_style = if matches!(month_view.selection.selection_type, SelectionType::WeekGoal(ref key) if key == &week_key) {
-            Style::default().bg(Color::Blue).fg(Color::White)
-        } else {
-            Style::default().fg(Color::Gray)
-        };
-        
-        let goal_paragraph = Paragraph::new(goal_text)
-            .style(goal_style)
-            .block(Block::default().borders(Borders::BOTTOM));
-        frame.render_widget(goal_paragraph, goal_area);
-        
-        // Render days
+        // NO MORE GOAL SPLIT - just render days directly
         let day_constraints: Vec<Constraint> = (0..7)
             .map(|_| Constraint::Percentage(100 / 7))
             .collect();
         
-        let day_layout = Layout::horizontal(day_constraints).split(day_area);
+        let day_layout = Layout::horizontal(day_constraints).split(week_area);
         
         for (day_index, &date) in week.iter().enumerate() {
             if day_index >= day_layout.len() {
@@ -537,18 +479,24 @@ fn render_day_cell(
         return;
     }
 
-    // Split inner area for day number and tasks
-    let day_layout = Layout::vertical([
-        Constraint::Length(1),  // Day number - always exactly 1 line
-        Constraint::Min(0),     // Tasks - expand to fill remaining space, can be 0 if no space
-    ]).split(inner_area);
+    // FIXED: Ensure day number ALWAYS gets space, tasks get ADDITIONAL space
+    let day_layout = if day_tasks.is_empty() {
+        // No tasks: just give all space to day number
+        Layout::vertical([Constraint::Min(1)]).split(inner_area)
+    } else {
+        // With tasks: day number gets exactly 1 line, tasks get remaining space
+        Layout::vertical([
+            Constraint::Length(1),                      // Day number - ALWAYS exactly 1 line
+            Constraint::Min(day_tasks.len() as u16),    // Tasks - at least 1 line per task
+        ]).split(inner_area)
+    };
     
-    // Always render the day number if we have any space
+    // ALWAYS render the day number as the first element
     if day_layout.len() > 0 && day_layout[0].height > 0 {
         frame.render_widget(day_paragraph, day_layout[0]);
     }
     
-    // Render tasks if there are any and if we have space for them
+    // Render tasks ONLY if we have tasks AND space for them
     if !day_tasks.is_empty() && day_layout.len() > 1 && day_layout[1].height > 0 {
         let task_items: Vec<ListItem> = day_tasks
             .iter()
