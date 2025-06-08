@@ -577,19 +577,15 @@ impl App {
         };
         
         let layout = Layout::vertical([
-            Constraint::Length(3),           // Header
             Constraint::Min(0),              // Main content
             Constraint::Length(footer_height), // Footer
         ]).split(area);
         
-        // Render header
-        self.render_header(frame, layout[0]);
-        
         // Render main content
-        render_month_view(frame, layout[1], &self.month_view, &self.data.events);
+        render_month_view(frame, layout[0], &self.month_view, &self.data.events);
         
         // Render footer
-        self.render_footer(frame, layout[2]);
+        self.render_footer(frame, layout[1]);
         
         // Render mode-specific overlays
         match &self.mode {
@@ -601,14 +597,6 @@ impl App {
             }
             AppMode::Normal => {}
         }
-    }
-    
-    fn render_header(&self, frame: &mut Frame, area: Rect) {
-        let title = "Task Manager - Month View";
-        let header = Paragraph::new(title)
-            .style(Style::default().fg(Color::White))
-            .block(Block::default().borders(Borders::ALL));
-        frame.render_widget(header, area);
     }
     
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
