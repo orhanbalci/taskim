@@ -4,6 +4,7 @@ mod task_edit;
 mod data;
 mod undo;
 mod config;
+mod utils;
 
 use crate::month_view::{MonthView, render_month_view, SelectionType};
 use crate::task::TaskData;
@@ -11,6 +12,7 @@ use crate::task_edit::{TaskEditState, render_task_edit_popup};
 use crate::data::{load_data, save_data};
 use crate::undo::{UndoStack, Operation};
 use crate::config::KEYBINDINGS;
+use crate::utils::days_in_month;
 
 use chrono::{Local, Timelike, Datelike};
 use color_eyre::Result;
@@ -514,12 +516,7 @@ impl App {
                 let current_day = self.month_view.get_selected_date().day();
                 
                 // Calculate days in the target month for the specified year
-                let days_in_month = match current_month {
-                    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                    4 | 6 | 9 | 11 => 30,
-                    2 => if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) { 29 } else { 28 },
-                    _ => 31,
-                };
+                let days_in_month = days_in_month(year, current_month);
                 
                 let safe_day = std::cmp::min(current_day, days_in_month);
                 return NaiveDate::from_ymd_opt(year, current_month, safe_day);
@@ -545,12 +542,7 @@ impl App {
                 let current_month = self.month_view.current_date.month();
                 
                 // Check if the day is valid for the current month
-                let days_in_month = match current_month {
-                    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                    4 | 6 | 9 | 11 => 30,
-                    2 => if current_year % 4 == 0 && (current_year % 100 != 0 || current_year % 400 == 0) { 29 } else { 28 },
-                    _ => 31,
-                };
+                let days_in_month = days_in_month(current_year, current_month);
                 
                 if day <= days_in_month {
                     return NaiveDate::from_ymd_opt(current_year, current_month, day);

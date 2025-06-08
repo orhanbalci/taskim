@@ -1,4 +1,5 @@
 use crate::task::Task;
+use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -52,12 +53,7 @@ impl MonthView {
     fn build_weeks(date: NaiveDate) -> Vec<Vec<NaiveDate>> {
         let first_of_month = date.with_day(1).unwrap();
         let last_of_month = date.with_day(
-            match date.month() {
-                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                4 | 6 | 9 | 11 => 30,
-                2 => if date.year() % 4 == 0 && (date.year() % 100 != 0 || date.year() % 400 == 0) { 29 } else { 28 },
-                _ => unreachable!(),
-            }
+            days_in_month(date.year(), date.month())
         ).unwrap();
         
         // Start from the first Sunday of the month view
@@ -148,12 +144,7 @@ impl MonthView {
                         let target_day = current_date.day();
                         self.prev_month();
                         // Try to find a similar date in the new month
-                        let days_in_month = match self.current_date.month() {
-                            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                            4 | 6 | 9 | 11 => 30,
-                            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
-                            _ => 31,
-                        };
+                        let days_in_month = days_in_month(self.current_date.year(), self.current_date.month());
                         let safe_day = std::cmp::min(target_day, days_in_month);
                         if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
                             self.selection = Selection {
@@ -221,12 +212,7 @@ impl MonthView {
                             let target_day = current_date.day();
                             self.next_month();
                             // Try to find a similar date in the new month
-                            let days_in_month = match self.current_date.month() {
-                                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                                4 | 6 | 9 | 11 => 30,
-                                2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
-                                _ => 31,
-                            };
+                            let days_in_month = days_in_month(self.current_date.year(), self.current_date.month());
                             let safe_day = std::cmp::min(target_day, days_in_month);
                             if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
                                 self.selection = Selection {
@@ -265,12 +251,7 @@ impl MonthView {
                                     // Go to next month
                                     let target_day = task_date.day();
                                     self.next_month();
-                                    let days_in_month = match self.current_date.month() {
-                                        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                                        4 | 6 | 9 | 11 => 30,
-                                        2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
-                                        _ => 31,
-                                    };
+                                    let days_in_month = days_in_month(self.current_date.year(), self.current_date.month());
                                     let safe_day = std::cmp::min(target_day, days_in_month);
                                     if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
                                         self.selection = Selection {
@@ -303,12 +284,7 @@ impl MonthView {
                     if new_date.month() != self.current_date.month() || new_date.year() != self.current_date.year() {
                         // Go to previous month and select the last day
                         self.prev_month();
-                        let days_in_month = match self.current_date.month() {
-                            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                            4 | 6 | 9 | 11 => 30,
-                            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
-                            _ => 31,
-                        };
+                        let days_in_month = days_in_month(self.current_date.year(), self.current_date.month());
                         if let Some(last_day) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), days_in_month) {
                             self.selection = Selection {
                                 selection_type: SelectionType::Day(last_day),
@@ -440,12 +416,7 @@ impl MonthView {
 
     // Move to last day of current month
     pub fn last_day_of_month(&mut self) {
-        let days_in_month = match self.current_date.month() {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => if self.current_date.year() % 4 == 0 && (self.current_date.year() % 100 != 0 || self.current_date.year() % 400 == 0) { 29 } else { 28 },
-            _ => 31,
-        };
+        let days_in_month = days_in_month(self.current_date.year(), self.current_date.month());
         
         if let Some(last_day) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), days_in_month) {
             self.selection = Selection {
@@ -467,12 +438,7 @@ impl MonthView {
         };
         
         // Calculate days in the target month
-        let days_in_month = match new_month {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => if new_year % 4 == 0 && (new_year % 100 != 0 || new_year % 400 == 0) { 29 } else { 28 },
-            _ => 31,
-        };
+        let days_in_month = days_in_month(new_year, new_month);
         
         // Preserve day or use last day of month if target day doesn't exist
         let safe_day = std::cmp::min(target_day, days_in_month);
@@ -500,12 +466,7 @@ impl MonthView {
         };
         
         // Calculate days in the target month
-        let days_in_month = match new_month {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => if new_year % 4 == 0 && (new_year % 100 != 0 || new_year % 400 == 0) { 29 } else { 28 },
-            _ => 31,
-        };
+        let days_in_month = days_in_month(new_year, new_month);
         
         // Preserve day or use last day of month if target day doesn't exist
         let safe_day = std::cmp::min(target_day, days_in_month);
