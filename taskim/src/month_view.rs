@@ -521,66 +521,6 @@ impl MonthView {
         }
     }
 
-    // Navigate to the first year (year 1 or a reasonable minimum year)
-    pub fn first_year(&mut self) {
-        let current_selected = self.get_selected_date();
-        let target_day = current_selected.day();
-        let target_month = self.current_date.month();
-        
-        // Go to year 1900 as a reasonable "first" year for practical purposes
-        let first_year = 1900;
-        
-        // Calculate days in the target month for the first year
-        let days_in_month = match target_month {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => if first_year % 4 == 0 && (first_year % 100 != 0 || first_year % 400 == 0) { 29 } else { 28 },
-            _ => 31,
-        };
-        
-        let safe_day = std::cmp::min(target_day, days_in_month);
-        
-        self.current_date = NaiveDate::from_ymd_opt(first_year, target_month, 1).unwrap();
-        self.weeks = Self::build_weeks(self.current_date);
-        
-        if let Some(target_date) = NaiveDate::from_ymd_opt(first_year, target_month, safe_day) {
-            self.selection = Selection {
-                selection_type: SelectionType::Day(target_date),
-                task_index_in_day: None,
-            };
-        }
-    }
-
-    // Navigate to the last year (a reasonable maximum year)
-    pub fn last_year(&mut self) {
-        let current_selected = self.get_selected_date();
-        let target_day = current_selected.day();
-        let target_month = self.current_date.month();
-        
-        // Go to year 2050 as a reasonable "last" year for practical purposes
-        let last_year = 2050;
-        
-        // Calculate days in the target month for the last year
-        let days_in_month = match target_month {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
-            2 => if last_year % 4 == 0 && (last_year % 100 != 0 || last_year % 400 == 0) { 29 } else { 28 },
-            _ => 31,
-        };
-        
-        let safe_day = std::cmp::min(target_day, days_in_month);
-        
-        self.current_date = NaiveDate::from_ymd_opt(last_year, target_month, 1).unwrap();
-        self.weeks = Self::build_weeks(self.current_date);
-        
-        if let Some(target_date) = NaiveDate::from_ymd_opt(last_year, target_month, safe_day) {
-            self.selection = Selection {
-                selection_type: SelectionType::Day(target_date),
-                task_index_in_day: None,
-            };
-        }
-    }
-
     // Navigate to today's date
     pub fn go_to_today(&mut self) {
         use chrono::Local;

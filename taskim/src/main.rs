@@ -67,11 +67,6 @@ impl CommandState {
             self.cursor_position += 1;
         }
     }
-    
-    fn clear(&mut self) {
-        self.input.clear();
-        self.cursor_position = 0;
-    }
 }
 
 struct App {
