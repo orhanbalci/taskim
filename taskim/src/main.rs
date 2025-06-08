@@ -175,8 +175,8 @@ impl App {
         // Handle multi-key sequences first
         if let Some(pending) = self.pending_key {
             if pending == 'g' && key.code == KeyCode::Char('g') && key.modifiers == KeyModifiers::NONE {
-                // Handle 'gg' - go to first year
-                self.month_view.first_year();
+                // Handle 'gg' - go to previous year
+                self.month_view.prev_year();
                 self.pending_key = None;
                 return Ok(());
             }
@@ -393,8 +393,8 @@ impl App {
             // Previous month (vim-style: H) - preserve day
             self.month_view.prev_month_preserve_day();
         } else if KEYBINDINGS.next_year.matches(key.code, key.modifiers) {
-            // Next/Last year (vim-style: G) - go to last year
-            self.month_view.last_year();
+            // Next year (vim-style: G)
+            self.month_view.next_year();
         } else if KEYBINDINGS.prev_year.matches(key.code, key.modifiers) {
             // Handle first 'g' for 'gg' sequence
             self.pending_key = Some('g');
