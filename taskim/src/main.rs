@@ -477,6 +477,26 @@ impl App {
             return Ok(());
         }
         
+        // Handle quit commands (vim-style)
+        match trimmed {
+            "q" | "quit" => {
+                self.should_exit = true;
+                return Ok(());
+            }
+            "q!" | "quit!" => {
+                // Force quit without saving
+                self.should_exit = true;
+                return Ok(());
+            }
+            "wq" | "x" => {
+                // Write and quit (save and exit)
+                self.save()?;
+                self.should_exit = true;
+                return Ok(());
+            }
+            _ => {}
+        }
+        
         // Handle help command
         if trimmed == "help" {
             // Show help in footer by temporarily switching modes - we'll handle this differently
@@ -610,15 +630,23 @@ impl App {
                         ]),
                         Line::from(vec![
                             Span::styled("YYYY", Style::default().fg(Color::Green)),
-                            Span::raw(" - Go to year (e.g., 2024)"),
+                            Span::raw(" - Go to year (e.g., 2024) | "),
+                            Span::styled("DD", Style::default().fg(Color::Green)),
+                            Span::raw(" - Go to day in current month (e.g., 15)"),
                         ]),
                         Line::from(vec![
                             Span::styled("MM/DD/YYYY", Style::default().fg(Color::Green)),
                             Span::raw(" - Go to specific date (e.g., 06/15/2024)"),
                         ]),
                         Line::from(vec![
-                            Span::styled("DD", Style::default().fg(Color::Green)),
-                            Span::raw(" - Go to day in current month (e.g., 15)"),
+                            Span::styled("Quit Commands:", Style::default().fg(Color::Yellow)),
+                            Span::raw(" "),
+                            Span::styled(":q", Style::default().fg(Color::Green)),
+                            Span::raw(" - Quit | "),
+                            Span::styled(":wq", Style::default().fg(Color::Green)),
+                            Span::raw(" - Save & quit | "),
+                            Span::styled(":q!", Style::default().fg(Color::Green)),
+                            Span::raw(" - Force quit"),
                         ]),
                         Line::from(vec![
                             Span::styled(":help", Style::default().fg(Color::Cyan)),
