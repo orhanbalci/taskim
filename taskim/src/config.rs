@@ -28,10 +28,14 @@ pub struct Config {
     
     // Task operations
     pub insert_edit: KeyBinding,
+    pub insert_above: KeyBinding,    // 'O' - insert task above current
+    pub insert_below: KeyBinding,    // 'o' - insert task below current
     pub delete: KeyBinding,
+    pub delete_line: KeyBinding,     // 'dd' - cut task (same as delete but for vim-style)
     pub toggle_complete: KeyBinding,
     pub yank: KeyBinding,
     pub paste: KeyBinding,
+    pub paste_above: KeyBinding,     // 'P' - paste above current task
     
     // Undo/Redo
     pub undo: KeyBinding,
@@ -79,12 +83,16 @@ pub const KEYBINDINGS: Config = Config {
     
     // Task operations
     insert_edit: KeyBinding { key: KeyCode::Char('i'), modifiers: KeyModifiers::NONE, description: "Insert/Edit", color: Color::Green },
+    insert_above: KeyBinding { key: KeyCode::Char('O'), modifiers: KeyModifiers::SHIFT, description: "Insert Above", color: Color::Green },
+    insert_below: KeyBinding { key: KeyCode::Char('o'), modifiers: KeyModifiers::NONE, description: "Insert Below", color: Color::Green },
     delete: KeyBinding { key: KeyCode::Char('x'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
+    delete_line: KeyBinding { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE, description: "Cut Task (dd)", color: Color::Red },
     toggle_complete: KeyBinding { key: KeyCode::Char('c'), modifiers: KeyModifiers::NONE, description: "Toggle Complete", color: Color::Blue },
     
     // Yank/Paste (vim-style)
     yank: KeyBinding { key: KeyCode::Char('y'), modifiers: KeyModifiers::NONE, description: "Yank (Copy)", color: Color::Yellow },
     paste: KeyBinding { key: KeyCode::Char('p'), modifiers: KeyModifiers::NONE, description: "Paste", color: Color::Yellow },
+    paste_above: KeyBinding { key: KeyCode::Char('P'), modifiers: KeyModifiers::SHIFT, description: "Paste Above", color: Color::Yellow },
     
     // Undo/Redo
     undo: KeyBinding { key: KeyCode::Char('u'), modifiers: KeyModifiers::NONE, description: "Undo", color: Color::Magenta },

@@ -1,4 +1,4 @@
-use crate::task::Task;
+use crate::task::{Task, TaskData};
 use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
@@ -156,9 +156,25 @@ impl MonthView {
                         let safe_day = std::cmp::min(target_day, days_in_month);
                         if let Some(target_date) = NaiveDate::from_ymd_opt(self.current_date.year(), self.current_date.month(), safe_day) {
                             self.select_day(target_date);
+                            
+                            // Auto-select first task if available
+                            let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(target_date)).collect();
+                            if !day_tasks.is_empty() {
+                                let mut sorted_tasks = day_tasks;
+                                sorted_tasks.sort_by_key(|t| t.order);
+                                self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                            }
                         }
                     } else {
                         self.select_day(new_date);
+                        
+                        // Auto-select first task if available
+                        let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(new_date)).collect();
+                        if !day_tasks.is_empty() {
+                            let mut sorted_tasks = day_tasks;
+                            sorted_tasks.sort_by_key(|t| t.order);
+                            self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                        }
                     }
                 }
             }
@@ -167,7 +183,8 @@ impl MonthView {
                 // Find the current task and move to previous task in the same day
                 if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
                     let task_date = task.start.date_naive();
-                    let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
+                    let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
+                    day_tasks.sort_by_key(|t| t.order); // Sort by order
                     
                     if let Some(current_index) = day_tasks.iter().position(|t| t.id == task_id) {
                         if current_index > 0 {
@@ -189,14 +206,24 @@ impl MonthView {
             SelectionType::Day(date) => {
                 let current_date = *date;
                 // Check if there are tasks on this day
-                let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(current_date)).collect();
+                let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(current_date)).collect();
+                day_tasks.sort_by_key(|t| t.order); // Sort by order
+                
                 if !day_tasks.is_empty() {
-                    // Move to first task
+                    // Move to first task (ordered)
                     self.select_task(day_tasks[0].id.clone(), Some(0));
                 } else {
                     // Move down one week
                     if let Some(new_date) = current_date.checked_add_signed(chrono::Duration::weeks(1)) {
                         self.navigate_to_date(new_date);
+                        
+                        // After navigating, check if the new day has tasks and auto-select first task
+                        let new_day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(new_date)).collect();
+                        if !new_day_tasks.is_empty() {
+                            let mut sorted_tasks = new_day_tasks;
+                            sorted_tasks.sort_by_key(|t| t.order);
+                            self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                        }
                     }
                 }
             }
@@ -205,7 +232,8 @@ impl MonthView {
                 // Find the current task and move to next task in the same day or to next week
                 if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
                     let task_date = task.start.date_naive();
-                    let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
+                    let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(task_date)).collect();
+                    day_tasks.sort_by_key(|t| t.order); // Sort by order
                     
                     if let Some(current_index) = day_tasks.iter().position(|t| t.id == task_id) {
                         if current_index < day_tasks.len() - 1 {
@@ -216,6 +244,14 @@ impl MonthView {
                             // Move to next week same day
                             if let Some(new_date) = task_date.checked_add_signed(chrono::Duration::weeks(1)) {
                                 self.navigate_to_date(new_date);
+                                
+                                // Check if new day has tasks and auto-select first task
+                                let new_day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(new_date)).collect();
+                                if !new_day_tasks.is_empty() {
+                                    let mut sorted_tasks = new_day_tasks;
+                                    sorted_tasks.sort_by_key(|t| t.order);
+                                    self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                                }
                             }
                         }
                     }
@@ -266,38 +302,32 @@ impl MonthView {
     }
 
     // Get the currently selected date
-    pub fn get_selected_date(&self) -> NaiveDate {
+    pub fn get_selected_date(&self, tasks: &[Task]) -> NaiveDate {
         match &self.selection.selection_type {
             SelectionType::Day(date) => *date,
-            SelectionType::Task(_task_id) => {
-                // For task selection, we need to search the weeks to find the task's date
-                // This is a fallback approach since we don't have direct task access
-                // In practice, when a task is selected, the UI should maintain the correct date
-                for week in &self.weeks {
-                    for &date in week {
-                        // This is a simplified approach - in a real implementation,
-                        // we'd need access to the task list to find the actual task date
-                        if date.month() == self.current_date.month() {
-                            return date;
-                        }
-                    }
+            SelectionType::Task(task_id) => {
+                // Find the actual task and return its date
+                if let Some(task) = tasks.iter().find(|t| &t.id == task_id) {
+                    task.start.date_naive()
+                } else {
+                    // Fallback to current date if task not found
+                    self.current_date
                 }
-                self.current_date
             }
         }
     }
 
     // Move to next week (same day of week)
-    pub fn next_week(&mut self) {
-        let current_selected = self.get_selected_date();
+    pub fn next_week(&mut self, tasks: &[Task]) {
+        let current_selected = self.get_selected_date(tasks);
         if let Some(new_date) = current_selected.checked_add_signed(chrono::Duration::weeks(1)) {
             self.navigate_to_date(new_date);
         }
     }
 
     // Move to previous week (same day of week)
-    pub fn prev_week(&mut self) {
-        let current_selected = self.get_selected_date();
+    pub fn prev_week(&mut self, tasks: &[Task]) {
+        let current_selected = self.get_selected_date(tasks);
         if let Some(new_date) = current_selected.checked_sub_signed(chrono::Duration::weeks(1)) {
             self.navigate_to_date(new_date);
         }
@@ -320,7 +350,15 @@ impl MonthView {
 
     // Helper method to preserve day when changing months
     fn navigate_to_month_preserve_day(&mut self, new_year: i32, new_month: u32) {
-        let current_selected = self.get_selected_date();
+        // Get the currently selected date from the selection
+        let current_selected = match &self.selection.selection_type {
+            SelectionType::Day(date) => *date,
+            SelectionType::Task(_) => {
+                // For task selections, we'll use the current date as fallback
+                // since we don't have task data here
+                self.current_date
+            }
+        };
         let target_day = current_selected.day();
         
         // Calculate days in the target month
@@ -366,6 +404,39 @@ impl MonthView {
         let today = Local::now().date_naive();
         self.navigate_to_date(today);
     }
+    
+    // Helper method to get the current task's order within its day
+    pub fn get_current_task_order(&self, tasks: &[Task]) -> Option<u32> {
+        match &self.selection.selection_type {
+            SelectionType::Task(task_id) => {
+                tasks.iter().find(|t| &t.id == task_id).map(|t| t.order)
+            }
+            _ => None,
+        }
+    }
+    
+    // Helper method to select a task by its order within a day
+    pub fn select_task_by_order(&mut self, date: NaiveDate, order: u32, tasks: &[Task]) {
+        let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+        day_tasks.sort_by_key(|t| t.order);
+        
+        if let Some(task) = day_tasks.iter().find(|t| t.order == order) {
+            let index = day_tasks.iter().position(|t| t.id == task.id);
+            self.select_task(task.id.clone(), index);
+        }
+    }
+    
+    // Navigate to a date and auto-select first task if available (used when changing days)
+    pub fn navigate_to_date_with_task_selection(&mut self, target_date: NaiveDate, tasks: &[Task]) {
+        self.navigate_to_date(target_date);
+        
+        // Auto-select first task if available
+        let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(target_date)).collect();
+        if !day_tasks.is_empty() {
+            day_tasks.sort_by_key(|t| t.order);
+            self.select_task(day_tasks[0].id.clone(), Some(0));
+        }
+    }
 }
 
 pub fn render_month_view(
@@ -388,7 +459,7 @@ pub fn render_month_view(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    // DRASTICALLY SIMPLIFIED: Calculate constraints for each week based on max tasks ONLY
+    // Calculate constraints for each week based on max tasks, ensuring proper expansion
     let week_constraints: Vec<Constraint> = month_view.weeks.iter()
         .map(|week| {
             // Find the maximum number of tasks in any day of this week
@@ -397,11 +468,14 @@ pub fn render_month_view(
                 .max()
                 .unwrap_or(0);
             
-            // CORRECTED: Day number + tasks (not replacing each other) + more space for borders
-            let week_height = 1 + max_tasks_in_week + 2; // day_number(1) + tasks(N) + borders+padding(2)  
-            let min_height = 4; // Minimum: day_number(1) + borders(2) + some_space(1)
+            // Calculate proper height: day_number(1) + tasks(N) + borders(2) + padding(1)
+            let week_height = if max_tasks_in_week == 0 {
+                4 // Minimum height when no tasks: day + borders + padding
+            } else {
+                1 + max_tasks_in_week + 3 // day_number(1) + tasks(N) + borders+padding(3)
+            };
             
-            Constraint::Length(week_height.max(min_height) as u16)
+            Constraint::Length(week_height as u16)
         })
         .collect();
     
@@ -443,8 +517,9 @@ fn render_day_cell(
     let is_current_month = date.month() == month_view.current_date.month();
     let is_selected_day = matches!(month_view.selection.selection_type, SelectionType::Day(selected_date) if selected_date == date);
     
-    // Get tasks for this day
-    let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+    // Get tasks for this day, sorted by order
+    let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+    day_tasks.sort_by_key(|t| t.order);
     
     // Day style
     let day_style = if is_selected_day {
@@ -468,7 +543,7 @@ fn render_day_cell(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    // Always render day number, even if space is very limited
+    // Always render day number, ensuring it gets proper space
     let day_number = format!("{}", date.day());
     let day_paragraph = Paragraph::new(day_number).style(day_style);
     
@@ -477,55 +552,55 @@ fn render_day_cell(
         return;
     }
 
-    // FIXED: Ensure day number ALWAYS gets space, tasks get ADDITIONAL space
-    let day_layout = if day_tasks.is_empty() {
-        // No tasks: just give all space to day number
-        Layout::vertical([Constraint::Min(1)]).split(inner_area)
+    // FIXED: Day number gets top line, tasks get remaining space if available
+    if day_tasks.is_empty() {
+        // No tasks: just render day number in available space
+        frame.render_widget(day_paragraph, inner_area);
     } else {
-        // With tasks: day number gets exactly 1 line, tasks get remaining space
-        Layout::vertical([
-            Constraint::Length(1),                      // Day number - ALWAYS exactly 1 line
-            Constraint::Min(day_tasks.len() as u16),    // Tasks - at least 1 line per task
-        ]).split(inner_area)
-    };
-    
-    // ALWAYS render the day number as the first element
-    if day_layout.len() > 0 && day_layout[0].height > 0 {
-        frame.render_widget(day_paragraph, day_layout[0]);
-    }
-    
-    // Render tasks ONLY if we have tasks AND space for them
-    if !day_tasks.is_empty() && day_layout.len() > 1 && day_layout[1].height > 0 {
-        let task_items: Vec<ListItem> = day_tasks
-            .iter()
-            .enumerate()
-            .map(|(_index, task)| {
-                let is_selected_task = matches!(
-                    month_view.selection.selection_type,
-                    SelectionType::Task(ref task_id) if task_id == &task.id
-                );
-                
-                let style = if is_selected_task {
-                    Style::default().bg(Color::Yellow).fg(Color::Black).add_modifier(Modifier::BOLD)
-                } else if task.completed {
-                    Style::default().fg(Color::Green)
-                } else {
-                    Style::default().fg(Color::White)
-                };
-                
-                let title = if task.title.len() > 8 {
-                    format!("{}...", &task.title[..5])
-                } else {
-                    task.title.clone()
-                };
-                
-                ListItem::new(title).style(style)
-            })
-            .collect();
+        // With tasks: day number gets exactly 1 line at top, tasks get rest
+        let day_layout = Layout::vertical([
+            Constraint::Length(1),                      // Day number - exactly 1 line
+            Constraint::Min(1),                         // Tasks - all remaining space
+        ]).split(inner_area);
         
-        let task_list = List::new(task_items)
-            .style(Style::default().fg(Color::White));
+        // Render day number in top line
+        if day_layout.len() > 0 && day_layout[0].height > 0 {
+            frame.render_widget(day_paragraph, day_layout[0]);
+        }
         
-        frame.render_widget(task_list, day_layout[1]);
+        // Render tasks in remaining space
+        if day_layout.len() > 1 && day_layout[1].height > 0 {
+            let task_items: Vec<ListItem> = day_tasks
+                .iter()
+                .enumerate()
+                .map(|(_index, task)| {
+                    let is_selected_task = matches!(
+                        month_view.selection.selection_type,
+                        SelectionType::Task(ref task_id) if task_id == &task.id
+                    );
+                    
+                    let style = if is_selected_task {
+                        Style::default().bg(Color::Yellow).fg(Color::Black).add_modifier(Modifier::BOLD)
+                    } else if task.completed {
+                        Style::default().fg(Color::Green)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    
+                    let title = if task.title.len() > 8 {
+                        format!("{}...", &task.title[..5])
+                    } else {
+                        task.title.clone()
+                    };
+                    
+                    ListItem::new(title).style(style)
+                })
+                .collect();
+            
+            let task_list = List::new(task_items)
+                .style(Style::default().fg(Color::White));
+            
+            frame.render_widget(task_list, day_layout[1]);
+        }
     }
 }

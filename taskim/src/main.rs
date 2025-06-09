@@ -79,6 +79,7 @@ struct App {
     undo_stack: UndoStack,
     yanked_task: Option<crate::task::Task>, // Store yanked task for paste operation
     pending_key: Option<char>, // For handling multi-key sequences like 'gg'
+    pending_insert_order: Option<u32>, // For tracking task insertion order
 }
 
 impl App {
@@ -95,6 +96,7 @@ impl App {
             undo_stack: UndoStack::new(50), // Allow up to 50 undo operations
             yanked_task: None,
             pending_key: None,
+            pending_insert_order: None,
         }
     }
     
@@ -119,13 +121,26 @@ impl App {
                 let mut new_state = state.clone();
                 if self.handle_task_edit_key(key, &mut new_state)? {
                     // Task edit completed
-                    let task = new_state.to_task();
+                    let mut task = new_state.to_task();
                     if new_state.is_new_task {
+                        // Use pending insert order if set (for 'o' and 'O' commands)
+                        if let Some(insert_order) = self.pending_insert_order.take() {
+                            self.data.insert_task_at_order(task.clone(), insert_order);
+                            
+                            // Select the new task by its order
+                            let task_date = task.start.date_naive();
+                            self.month_view.select_task_by_order(task_date, insert_order, &self.data.events);
+                        } else {
+                            // Regular insertion (for 'i' command) - add to end
+                            let task_date = task.start.date_naive();
+                            task.order = self.data.max_order_for_date(task_date) + 1;
+                            self.data.events.push(task.clone());
+                        }
+                        
                         // Track task creation
                         self.undo_stack.push(Operation::CreateTask {
                             task: task.clone(),
                         });
-                        self.data.events.push(task);
                     } else {
                         // Track task edit
                         if let Some(existing) = self.data.events.iter_mut().find(|t| Some(&t.id) == new_state.task_id.as_ref()) {
@@ -194,11 +209,90 @@ impl App {
                     }
                 }
             }
+        } else if KEYBINDINGS.insert_below.matches(key.code, key.modifiers) {
+            // Insert task below current position (vim-style: o)
+            let selected_date = self.month_view.get_selected_date(&self.data.events);
+            let edit_state = TaskEditState::new_task(selected_date);
+            
+            // Store the insertion order for when the task is created
+            let insert_order = if let Some(current_order) = self.month_view.get_current_task_order(&self.data.events) {
+                current_order + 1
+            } else {
+                self.data.max_order_for_date(selected_date) + 1
+            };
+            
+            // We'll need to track this order for when the task gets created
+            // For now, set up the task edit state
+            self.pending_insert_order = Some(insert_order);
+            self.mode = AppMode::TaskEdit(edit_state);
+        } else if KEYBINDINGS.insert_above.matches(key.code, key.modifiers) {
+            // Insert task above current position (vim-style: O)
+            let selected_date = self.month_view.get_selected_date(&self.data.events);
+            let edit_state = TaskEditState::new_task(selected_date);
+            
+            // Store the insertion order for when the task is created
+            let insert_order = if let Some(current_order) = self.month_view.get_current_task_order(&self.data.events) {
+                current_order
+            } else {
+                0
+            };
+            
+            // We'll need to track this order for when the task gets created
+            self.pending_insert_order = Some(insert_order);
+            self.mode = AppMode::TaskEdit(edit_state);
+        } else if KEYBINDINGS.delete_line.matches(key.code, key.modifiers) {
+            // Handle 'dd' sequence for cutting tasks (vim-style)
+            if let Some(pending) = self.pending_key {
+                if pending == 'd' && key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
+                    // Cut the selected task (same as delete but store in yanked_task)
+                    if let Some(task_id) = self.month_view.get_selected_task_id() {
+                        if let Some(task) = self.data.remove_task_and_reorder(&task_id) {
+                            let task_date = task.start.date_naive();
+                            
+                            // Store the cut task for pasting
+                            self.yanked_task = Some(task.clone());
+                            
+                            // Track deletion for undo functionality
+                            self.undo_stack.push(Operation::DeleteTask {
+                                task,
+                                original_date: task_date,
+                            });
+                            
+                            // Check if there are any remaining tasks on the same date
+                            let remaining_tasks = self.data.get_tasks_for_date(task_date);
+                            
+                            if remaining_tasks.is_empty() {
+                                // No more tasks on this day, select the day itself
+                                self.month_view.selection = month_view::Selection {
+                                    selection_type: month_view::SelectionType::Day(task_date),
+                                    task_index_in_day: None,
+                                };
+                            } else {
+                                // Select the first remaining task
+                                self.month_view.selection = month_view::Selection {
+                                    selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
+                                    task_index_in_day: Some(0),
+                                };
+                            }
+                            
+                            self.save()?;
+                        }
+                    }
+                    self.pending_key = None;
+                    return Ok(());
+                } else {
+                    // Clear pending key and continue with normal processing
+                    self.pending_key = None;
+                }
+            } else {
+                // First 'd' in potential 'dd' sequence
+                self.pending_key = Some('d');
+                return Ok(());
+            }
         } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {
-            // Immediately delete the selected task
+            // Immediately delete the selected task using the ordering-aware method
             if let Some(task_id) = self.month_view.get_selected_task_id() {
-                if let Some(task_index) = self.data.events.iter().position(|t| t.id == task_id) {
-                    let deleted_task = self.data.events.remove(task_index);
+                if let Some(deleted_task) = self.data.remove_task_and_reorder(&task_id) {
                     let task_date = deleted_task.start.date_naive();
                     
                     // Track deletion for undo functionality
@@ -208,9 +302,7 @@ impl App {
                     });
                     
                     // Check if there are any remaining tasks on the same date
-                    let remaining_tasks: Vec<_> = self.data.events.iter()
-                        .filter(|t| t.is_on_date(task_date))
-                        .collect();
+                    let remaining_tasks = self.data.get_tasks_for_date(task_date);
                     
                     if remaining_tasks.is_empty() {
                         // No more tasks on this day, select the day itself
@@ -219,7 +311,7 @@ impl App {
                             task_index_in_day: None,
                         };
                     } else {
-                        // Select the first remaining task
+                        // Select the first remaining task (ordered)
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
                             task_index_in_day: Some(0),
@@ -340,9 +432,9 @@ impl App {
                 }
             }
         } else if KEYBINDINGS.paste.matches(key.code, key.modifiers) {
-            // Paste task
+            // Paste task below current position
             if let Some(yanked_task) = &self.yanked_task {
-                let selected_date = self.month_view.get_selected_date();
+                let selected_date = self.month_view.get_selected_date(&self.data.events);
                 let mut new_task = yanked_task.clone();
                 
                 // Generate new ID for the pasted task
@@ -358,13 +450,59 @@ impl App {
                 new_task.start = new_start;
                 new_task.end = new_start + duration;
                 
+                // Insert task with proper ordering
+                let insert_order = if let Some(current_order) = self.month_view.get_current_task_order(&self.data.events) {
+                    current_order + 1
+                } else {
+                    self.data.max_order_for_date(selected_date) + 1
+                };
+                
+                self.data.insert_task_at_order(new_task.clone(), insert_order);
+                
                 // Track the paste operation for undo
                 self.undo_stack.push(Operation::CreateTask {
                     task: new_task.clone(),
                 });
                 
-                // Add the task to data
-                self.data.events.push(new_task);
+                // Select the new task
+                self.month_view.select_task_by_order(selected_date, insert_order, &self.data.events);
+                self.save()?;
+            }
+        } else if KEYBINDINGS.paste_above.matches(key.code, key.modifiers) {
+            // Paste task above current position
+            if let Some(yanked_task) = &self.yanked_task {
+                let selected_date = self.month_view.get_selected_date(&self.data.events);
+                let mut new_task = yanked_task.clone();
+                
+                // Generate new ID for the pasted task
+                new_task.id = format!("task_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default());
+                
+                // Set new start/end times for the selected date
+                let duration = new_task.end - new_task.start;
+                let new_start = selected_date.and_hms_opt(
+                    new_task.start.time().hour(),
+                    new_task.start.time().minute(),
+                    new_task.start.time().second()
+                ).unwrap().and_utc();
+                new_task.start = new_start;
+                new_task.end = new_start + duration;
+                
+                // Insert task with proper ordering (above current)
+                let insert_order = if let Some(current_order) = self.month_view.get_current_task_order(&self.data.events) {
+                    current_order
+                } else {
+                    0
+                };
+                
+                self.data.insert_task_at_order(new_task.clone(), insert_order);
+                
+                // Track the paste operation for undo
+                self.undo_stack.push(Operation::CreateTask {
+                    task: new_task.clone(),
+                });
+                
+                // Select the new task
+                self.month_view.select_task_by_order(selected_date, insert_order, &self.data.events);
                 self.save()?;
             }
         } else if KEYBINDINGS.next_month.matches(key.code, key.modifiers) {
@@ -384,10 +522,10 @@ impl App {
             self.month_view.go_to_today();
         } else if KEYBINDINGS.next_week.matches(key.code, key.modifiers) {
             // Next week (vim-style: w)
-            self.month_view.next_week();
+            self.month_view.next_week(&self.data.events);
         } else if KEYBINDINGS.prev_week.matches(key.code, key.modifiers) {
             // Previous week (vim-style: b)
-            self.month_view.prev_week();
+            self.month_view.prev_week(&self.data.events);
         } else if KEYBINDINGS.first_day_of_month.matches(key.code, key.modifiers) {
             // First day of month (vim-style: 0)
             self.month_view.first_day_of_month();
@@ -530,7 +668,7 @@ impl App {
         if let Ok(year) = input.parse::<i32>() {
             if year >= 1900 && year <= 2050 {
                 let current_month = self.month_view.current_date.month();
-                let current_day = self.month_view.get_selected_date().day();
+                let current_day = self.month_view.get_selected_date(&self.data.events).day();
                 
                 // Calculate days in the target month for the specified year
                 let days_in_month = days_in_month(year, current_month);
