@@ -4,7 +4,7 @@ use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -25,6 +25,7 @@ pub struct MonthView {
     pub current_date: NaiveDate,
     pub selection: Selection,
     pub weeks: Vec<Vec<NaiveDate>>,
+    pub wrap_enabled: bool,
 }
 
 impl MonthView {
@@ -36,6 +37,7 @@ impl MonthView {
             current_date,
             selection,
             weeks,
+            wrap_enabled: false,
         }
     }
     
@@ -45,6 +47,15 @@ impl MonthView {
             selection_type: SelectionType::Day(date),
             task_index_in_day: None,
         }
+    }
+    
+    // Add methods to control wrap setting
+    pub fn set_wrap(&mut self, enabled: bool) {
+        self.wrap_enabled = enabled;
+    }
+    
+    pub fn is_wrap_enabled(&self) -> bool {
+        self.wrap_enabled
     }
     
     // Helper method to create a task selection
@@ -427,6 +438,29 @@ impl MonthView {
     }
 }
 
+// Helper function to calculate wrapped text height
+fn calculate_wrapped_text_height(text: &str, width: usize) -> usize {
+    if width == 0 {
+        return 1;
+    }
+    
+    let lines = text.lines().collect::<Vec<_>>();
+    if lines.is_empty() {
+        return 1;
+    }
+    
+    let mut total_height = 0;
+    for line in lines {
+        if line.is_empty() {
+            total_height += 1;
+        } else {
+            total_height += (line.len() + width - 1) / width; // Ceiling division
+        }
+    }
+    
+    std::cmp::max(1, total_height)
+}
+
 pub fn render_month_view(
     frame: &mut Frame,
     area: Rect,
@@ -447,23 +481,47 @@ pub fn render_month_view(
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     
-    // Calculate constraints for each week based on max tasks, ensuring proper expansion
+    // Calculate constraints for each week based on max tasks and wrap setting
     let week_constraints: Vec<Constraint> = month_view.weeks.iter()
         .map(|week| {
-            // Find the maximum number of tasks in any day of this week
-            let max_tasks_in_week = week.iter()
-                .map(|&date| tasks.iter().filter(|t| t.is_on_date(date)).count())
-                .max()
-                .unwrap_or(0);
-            
-            // Calculate proper height: day_number(1) + tasks(N) + borders(2) + padding(1)
-            let week_height = if max_tasks_in_week == 0 {
-                4 // Minimum height when no tasks: day + borders + padding
+            if month_view.wrap_enabled {
+                // Calculate height based on wrapped text
+                let max_height_in_week = week.iter()
+                    .map(|&date| {
+                        let day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(date)).collect();
+                        if day_tasks.is_empty() {
+                            4 // Minimum height: day + borders + padding
+                        } else {
+                            // Calculate available width for tasks (day cell width - borders - padding)
+                            let day_width = (inner_area.width / 7).saturating_sub(2); // subtract borders
+                            let task_width = day_width.saturating_sub(1) as usize; // subtract padding
+                            
+                            let total_task_height: usize = day_tasks.iter()
+                                .map(|task| calculate_wrapped_text_height(&task.title, task_width))
+                                .sum();
+                            
+                            1 + total_task_height + 3 // day_number(1) + tasks + borders+padding(3)
+                        }
+                    })
+                    .max()
+                    .unwrap_or(4);
+                
+                Constraint::Length(max_height_in_week as u16)
             } else {
-                1 + max_tasks_in_week + 3 // day_number(1) + tasks(N) + borders+padding(3)
-            };
-            
-            Constraint::Length(week_height as u16)
+                // Original logic for nowrap mode
+                let max_tasks_in_week = week.iter()
+                    .map(|&date| tasks.iter().filter(|t| t.is_on_date(date)).count())
+                    .max()
+                    .unwrap_or(0);
+                
+                let week_height = if max_tasks_in_week == 0 {
+                    4 // Minimum height when no tasks: day + borders + padding
+                } else {
+                    1 + max_tasks_in_week + 3 // day_number(1) + tasks(N) + borders+padding(3)
+                };
+                
+                Constraint::Length(week_height as u16)
+            }
         })
         .collect();
     
@@ -558,37 +616,122 @@ fn render_day_cell(
         
         // Render tasks in remaining space
         if day_layout.len() > 1 && day_layout[1].height > 0 {
-            let task_items: Vec<ListItem> = day_tasks
-                .iter()
-                .enumerate()
-                .map(|(_index, task)| {
-                    let is_selected_task = matches!(
-                        month_view.selection.selection_type,
-                        SelectionType::Task(ref task_id) if task_id == &task.id
-                    );
-                    
-                    let style = if is_selected_task {
-                        Style::default().bg(Color::Yellow).fg(Color::Black).add_modifier(Modifier::BOLD)
-                    } else if task.completed {
-                        Style::default().fg(Color::Green)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-                    
-                    let title = if task.title.len() > 8 {
-                        format!("{}...", &task.title[..5])
-                    } else {
-                        task.title.clone()
-                    };
-                    
-                    ListItem::new(title).style(style)
-                })
-                .collect();
+            let task_area = day_layout[1];
             
-            let task_list = List::new(task_items)
-                .style(Style::default().fg(Color::White));
-            
-            frame.render_widget(task_list, day_layout[1]);
+            if month_view.wrap_enabled {
+                // Wrap mode: render tasks as individual paragraphs
+                render_tasks_wrapped(frame, task_area, &day_tasks, month_view);
+            } else {
+                // Nowrap mode: render tasks as list with truncation
+                render_tasks_nowrap(frame, task_area, &day_tasks, month_view);
+            }
         }
+    }
+}
+
+fn render_tasks_nowrap(
+    frame: &mut Frame,
+    area: Rect,
+    day_tasks: &[&Task],
+    month_view: &MonthView,
+) {
+    let task_items: Vec<ListItem> = day_tasks
+        .iter()
+        .enumerate()
+        .map(|(_index, task)| {
+            let is_selected_task = matches!(
+                month_view.selection.selection_type,
+                SelectionType::Task(ref task_id) if task_id == &task.id
+            );
+            
+            let style = if is_selected_task {
+                Style::default().bg(Color::Yellow).fg(Color::Black).add_modifier(Modifier::BOLD)
+            } else if task.completed {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
+            let title = if task.title.len() > max_width && max_width > 3 {
+                format!("{}...", &task.title[..max_width.saturating_sub(3)])
+            } else {
+                task.title.clone()
+            };
+            
+            ListItem::new(title).style(style)
+        })
+        .collect();
+    
+    let task_list = List::new(task_items)
+        .style(Style::default().fg(Color::White));
+    
+    frame.render_widget(task_list, area);
+}
+
+fn render_tasks_wrapped(
+    frame: &mut Frame,
+    area: Rect,
+    day_tasks: &[&Task],
+    month_view: &MonthView,
+) {
+    if day_tasks.is_empty() {
+        return;
+    }
+    
+    // Calculate height for each task based on wrapping
+    let task_width = area.width.saturating_sub(1) as usize; // Account for padding
+    let task_heights: Vec<u16> = day_tasks.iter()
+        .map(|task| calculate_wrapped_text_height(&task.title, task_width) as u16)
+        .collect();
+    
+    // If we have more tasks than can fit, truncate the constraints
+    let available_height = area.height as usize;
+    let mut constraints_to_use = Vec::new();
+    let mut used_height = 0;
+    
+    for &height in task_heights.iter() {
+        if used_height + height as usize <= available_height {
+            constraints_to_use.push(Constraint::Length(height));
+            used_height += height as usize;
+        } else if used_height < available_height {
+            // Use remaining space for the last task
+            constraints_to_use.push(Constraint::Length((available_height - used_height) as u16));
+            break;
+        } else {
+            break;
+        }
+    }
+    
+    if constraints_to_use.is_empty() {
+        return;
+    }
+    
+    let task_layout = Layout::vertical(constraints_to_use).split(area);
+    
+    // Render each task as a paragraph
+    for (i, task) in day_tasks.iter().enumerate() {
+        if i >= task_layout.len() {
+            break;
+        }
+        
+        let is_selected_task = matches!(
+            month_view.selection.selection_type,
+            SelectionType::Task(ref task_id) if task_id == &task.id
+        );
+        
+        let style = if is_selected_task {
+            Style::default().bg(Color::Yellow).fg(Color::Black).add_modifier(Modifier::BOLD)
+        } else if task.completed {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        
+        let paragraph = Paragraph::new(task.title.clone())
+            .style(style)
+            .wrap(Wrap { trim: true });
+        
+        frame.render_widget(paragraph, task_layout[i]);
     }
 }

@@ -636,6 +636,19 @@ impl App {
             return Ok(());
         }
         
+        // Handle wrap commands
+        match trimmed {
+            "set wrap" | "wrap" => {
+                self.month_view.set_wrap(true);
+                return Ok(());
+            }
+            "set nowrap" | "nowrap" => {
+                self.month_view.set_wrap(false);
+                return Ok(());
+            }
+            _ => {}
+        }
+        
         // Try to parse as a date in various formats
         if let Some(date) = self.parse_date_command(trimmed) {
             // Navigate to the specified date using the existing methods
@@ -724,7 +737,7 @@ impl App {
         
         // Create main layout - adjust footer size based on command mode
         let footer_height = match &self.mode {
-            AppMode::Command(state) if state.show_help => 6, // More space for help
+            AppMode::Command(state) if state.show_help => 7, // More space for help (added wrap commands)
             _ => 2, // Normal footer size
         };
         
@@ -779,6 +792,14 @@ impl App {
                             Span::raw(" - Save & quit | "),
                             Span::styled(":q!", Style::default().fg(Color::Green)),
                             Span::raw(" - Force quit"),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("Display Commands:", Style::default().fg(Color::Yellow)),
+                            Span::raw(" "),
+                            Span::styled(":set wrap", Style::default().fg(Color::Green)),
+                            Span::raw(" - Enable text wrapping | "),
+                            Span::styled(":set nowrap", Style::default().fg(Color::Green)),
+                            Span::raw(" - Disable text wrapping"),
                         ]),
                         Line::from(vec![
                             Span::styled(":help", Style::default().fg(Color::Cyan)),
