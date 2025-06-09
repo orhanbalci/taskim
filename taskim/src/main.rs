@@ -240,11 +240,11 @@ impl App {
             // We'll need to track this order for when the task gets created
             self.pending_insert_order = Some(insert_order);
             self.mode = AppMode::TaskEdit(edit_state);
-        } else if KEYBINDINGS.delete_line.matches(key.code, key.modifiers) {
+        } else if key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
             // Handle 'dd' sequence for cutting tasks (vim-style)
             if let Some(pending) = self.pending_key {
-                if pending == 'd' && key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
-                    // Cut the selected task (same as delete but store in yanked_task)
+                if pending == 'd' {
+                    // Second 'd' in 'dd' sequence - cut the selected task
                     if let Some(task_id) = self.month_view.get_selected_task_id() {
                         if let Some(task) = self.data.remove_task_and_reorder(&task_id) {
                             let task_date = task.start.date_naive();
@@ -290,10 +290,13 @@ impl App {
                 return Ok(());
             }
         } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {
-            // Immediately delete the selected task using the ordering-aware method
+            // Delete/cut the selected task (vim-style 'x') - same as 'dd'
             if let Some(task_id) = self.month_view.get_selected_task_id() {
                 if let Some(deleted_task) = self.data.remove_task_and_reorder(&task_id) {
                     let task_date = deleted_task.start.date_naive();
+                    
+                    // Store the cut task for pasting (copy functionality)
+                    self.yanked_task = Some(deleted_task.clone());
                     
                     // Track deletion for undo functionality
                     self.undo_stack.push(Operation::DeleteTask {
