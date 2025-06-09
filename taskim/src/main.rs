@@ -21,7 +21,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect, Position},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
     DefaultTerminal, Frame,
 };
 

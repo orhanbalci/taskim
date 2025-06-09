@@ -1,4 +1,4 @@
-use crate::task::{Task, TaskData};
+use crate::task::Task;
 use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
@@ -423,18 +423,6 @@ impl MonthView {
         if let Some(task) = day_tasks.iter().find(|t| t.order == order) {
             let index = day_tasks.iter().position(|t| t.id == task.id);
             self.select_task(task.id.clone(), index);
-        }
-    }
-    
-    // Navigate to a date and auto-select first task if available (used when changing days)
-    pub fn navigate_to_date_with_task_selection(&mut self, target_date: NaiveDate, tasks: &[Task]) {
-        self.navigate_to_date(target_date);
-        
-        // Auto-select first task if available
-        let mut day_tasks: Vec<_> = tasks.iter().filter(|t| t.is_on_date(target_date)).collect();
-        if !day_tasks.is_empty() {
-            day_tasks.sort_by_key(|t| t.order);
-            self.select_task(day_tasks[0].id.clone(), Some(0));
         }
     }
 }

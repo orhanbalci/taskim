@@ -64,38 +64,6 @@ impl TaskData {
         tasks
     }
     
-    /// Get mutable references to all tasks for a specific date, sorted by order
-    pub fn get_tasks_for_date_mut(&mut self, date: chrono::NaiveDate) -> Vec<&mut Task> {
-        let mut task_indices: Vec<_> = self.events.iter()
-            .enumerate()
-            .filter(|(_, t)| t.is_on_date(date))
-            .map(|(i, _)| i)
-            .collect();
-        
-        // Sort by order
-        task_indices.sort_by_key(|&i| self.events[i].order);
-        
-        // Create a sorted vector of mutable references
-        // We need to use unsafe here due to borrowing rules
-        let tasks_ptr = self.events.as_mut_ptr();
-        task_indices.into_iter()
-            .map(|i| unsafe { &mut *tasks_ptr.add(i) })
-            .collect()
-    }
-    
-    /// Reorder tasks for a specific date to ensure consecutive ordering starting from 0
-    pub fn normalize_task_order(&mut self, date: chrono::NaiveDate) {
-        let mut tasks: Vec<_> = self.events.iter_mut()
-            .filter(|t| t.is_on_date(date))
-            .collect();
-        
-        tasks.sort_by_key(|t| t.order);
-        
-        for (new_order, task) in tasks.iter_mut().enumerate() {
-            task.order = new_order as u32;
-        }
-    }
-    
     /// Get the maximum order for tasks on a specific date
     pub fn max_order_for_date(&self, date: chrono::NaiveDate) -> u32 {
         self.events.iter()
