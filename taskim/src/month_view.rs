@@ -441,15 +441,16 @@ fn scramble_text(text: &str, scramble_mode: bool) -> String {
         return text.to_string();
     }
     
-    // Convert each character to a digit, preserving spaces and length
+    // Convert each character to a random digit, preserving spaces and length
     text.chars()
         .enumerate()
         .map(|(i, ch)| {
             if ch.is_whitespace() {
                 ch // Preserve whitespace
             } else {
-                // Use character position to generate a consistent digit
-                char::from_digit((i % 10) as u32, 10).unwrap_or('0')
+                // Use a simple hash of character position and character value to generate consistent random-looking digits
+                let hash = (i.wrapping_mul(31).wrapping_add(ch as usize)).wrapping_mul(17);
+                char::from_digit((hash % 10) as u32, 10).unwrap_or('0')
             }
         })
         .collect()
