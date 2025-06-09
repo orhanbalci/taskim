@@ -517,7 +517,16 @@ pub fn render_month_view(
                             
                             let total_task_height: usize = day_tasks.iter()
                                 .map(|task| {
-                                    let title_to_measure = scramble_text(&task.title, scramble_mode);
+                                    // For height calculation, check if this task is selected
+                                    let is_selected_task = matches!(
+                                        month_view.selection.selection_type,
+                                        SelectionType::Task(ref task_id) if task_id == &task.id
+                                    );
+                                    let title_to_measure = if is_selected_task {
+                                        task.title.clone()
+                                    } else {
+                                        scramble_text(&task.title, scramble_mode)
+                                    };
                                     calculate_wrapped_text_height(&title_to_measure, task_width)
                                 })
                                 .sum();
@@ -678,10 +687,20 @@ fn render_tasks_nowrap(
             
             let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
             let title = if task.title.len() > max_width && max_width > 3 {
-                let scrambled_title = scramble_text(&task.title, scramble_mode);
-                format!("{}...", &scrambled_title[..max_width.saturating_sub(3)])
+                // Show unscrambled text for selected task, scrambled for others
+                let display_title = if is_selected_task {
+                    task.title.clone()
+                } else {
+                    scramble_text(&task.title, scramble_mode)
+                };
+                format!("{}...", &display_title[..max_width.saturating_sub(3)])
             } else {
-                scramble_text(&task.title, scramble_mode)
+                // Show unscrambled text for selected task, scrambled for others
+                if is_selected_task {
+                    task.title.clone()
+                } else {
+                    scramble_text(&task.title, scramble_mode)
+                }
             };
             
             ListItem::new(title).style(style)
@@ -709,7 +728,16 @@ fn render_tasks_wrapped(
     let task_width = area.width.saturating_sub(1) as usize; // Account for padding
     let task_heights: Vec<u16> = day_tasks.iter()
         .map(|task| {
-            let title_to_measure = scramble_text(&task.title, scramble_mode);
+            // For height calculation, we need to check if this task is selected
+            let is_selected_task = matches!(
+                month_view.selection.selection_type,
+                SelectionType::Task(ref task_id) if task_id == &task.id
+            );
+            let title_to_measure = if is_selected_task {
+                task.title.clone()
+            } else {
+                scramble_text(&task.title, scramble_mode)
+            };
             calculate_wrapped_text_height(&title_to_measure, task_width) as u16
         })
         .collect();
@@ -757,7 +785,14 @@ fn render_tasks_wrapped(
             Style::default().fg(Color::White)
         };
         
-        let paragraph = Paragraph::new(scramble_text(&task.title, scramble_mode))
+        let paragraph = Paragraph::new(
+            // Show unscrambled text for selected task, scrambled for others
+            if is_selected_task {
+                task.title.clone()
+            } else {
+                scramble_text(&task.title, scramble_mode)
+            }
+        )
             .style(style)
             .wrap(Wrap { trim: true });
         
