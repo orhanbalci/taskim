@@ -80,6 +80,7 @@ struct App {
     yanked_task: Option<crate::task::Task>, // Store yanked task for paste operation
     pending_key: Option<char>, // For handling multi-key sequences like 'gg'
     pending_insert_order: Option<u32>, // For tracking task insertion order
+    scramble_mode: bool, // Toggle for scrambling task names with numbers
 }
 
 impl App {
@@ -97,6 +98,7 @@ impl App {
             yanked_task: None,
             pending_key: None,
             pending_insert_order: None,
+            scramble_mode: false,
         }
     }
     
@@ -530,6 +532,9 @@ impl App {
         } else if key.code == KeyCode::Char(':') && key.modifiers == KeyModifiers::NONE {
             // Enter command mode (vim-style: :)
             self.mode = AppMode::Command(CommandState::new());
+        } else if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::NONE {
+            // Toggle scramble mode
+            self.scramble_mode = !self.scramble_mode;
         }
         Ok(())
     }
@@ -747,7 +752,7 @@ impl App {
         ]).split(area);
         
         // Render main content
-        render_month_view(frame, layout[0], &self.month_view, &self.data.events);
+        render_month_view(frame, layout[0], &self.month_view, &self.data.events, self.scramble_mode);
         
         // Render footer
         self.render_footer(frame, layout[1]);

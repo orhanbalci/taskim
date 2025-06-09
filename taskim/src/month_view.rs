@@ -54,9 +54,6 @@ impl MonthView {
         self.wrap_enabled = enabled;
     }
     
-    pub fn is_wrap_enabled(&self) -> bool {
-        self.wrap_enabled
-    }
     
     // Helper method to create a task selection
     fn create_task_selection(task_id: String, index: Option<usize>) -> Selection {
@@ -438,6 +435,26 @@ impl MonthView {
     }
 }
 
+// Helper function to scramble text with numbers while preserving length
+fn scramble_text(text: &str, scramble_mode: bool) -> String {
+    if !scramble_mode {
+        return text.to_string();
+    }
+    
+    // Convert each character to a digit, preserving spaces and length
+    text.chars()
+        .enumerate()
+        .map(|(i, ch)| {
+            if ch.is_whitespace() {
+                ch // Preserve whitespace
+            } else {
+                // Use character position to generate a consistent digit
+                char::from_digit((i % 10) as u32, 10).unwrap_or('0')
+            }
+        })
+        .collect()
+}
+
 // Helper function to calculate wrapped text height
 fn calculate_wrapped_text_height(text: &str, width: usize) -> usize {
     if width == 0 {
@@ -466,6 +483,7 @@ pub fn render_month_view(
     area: Rect,
     month_view: &MonthView,
     tasks: &[Task],
+    scramble_mode: bool,
 ) {
     let title = format!(
         "{} {}",
@@ -497,7 +515,10 @@ pub fn render_month_view(
                             let task_width = day_width.saturating_sub(1) as usize; // subtract padding
                             
                             let total_task_height: usize = day_tasks.iter()
-                                .map(|task| calculate_wrapped_text_height(&task.title, task_width))
+                                .map(|task| {
+                                    let title_to_measure = scramble_text(&task.title, scramble_mode);
+                                    calculate_wrapped_text_height(&title_to_measure, task_width)
+                                })
                                 .sum();
                             
                             1 + total_task_height + 3 // day_number(1) + tasks + borders+padding(3)
@@ -515,7 +536,7 @@ pub fn render_month_view(
                     .unwrap_or(0);
                 
                 let week_height = if max_tasks_in_week == 0 {
-                    4 // Minimum height when no tasks: day + borders + padding
+                    4 // Minimum height when no tasks: day +
                 } else {
                     1 + max_tasks_in_week + 3 // day_number(1) + tasks(N) + borders+padding(3)
                 };
@@ -547,7 +568,7 @@ pub fn render_month_view(
             }
             
             let day_area = day_layout[day_index];
-            render_day_cell(frame, day_area, date, month_view, tasks);
+            render_day_cell(frame, day_area, date, month_view, tasks, scramble_mode);
         }
     }
 }
@@ -559,6 +580,7 @@ fn render_day_cell(
     date: NaiveDate,
     month_view: &MonthView,
     tasks: &[Task],
+    scramble_mode: bool,
 ) {
     let is_current_month = date.month() == month_view.current_date.month();
     let is_selected_day = matches!(month_view.selection.selection_type, SelectionType::Day(selected_date) if selected_date == date);
@@ -620,10 +642,10 @@ fn render_day_cell(
             
             if month_view.wrap_enabled {
                 // Wrap mode: render tasks as individual paragraphs
-                render_tasks_wrapped(frame, task_area, &day_tasks, month_view);
+                render_tasks_wrapped(frame, task_area, &day_tasks, month_view, scramble_mode);
             } else {
                 // Nowrap mode: render tasks as list with truncation
-                render_tasks_nowrap(frame, task_area, &day_tasks, month_view);
+                render_tasks_nowrap(frame, task_area, &day_tasks, month_view, scramble_mode);
             }
         }
     }
@@ -634,6 +656,7 @@ fn render_tasks_nowrap(
     area: Rect,
     day_tasks: &[&Task],
     month_view: &MonthView,
+    scramble_mode: bool,
 ) {
     let task_items: Vec<ListItem> = day_tasks
         .iter()
@@ -654,9 +677,10 @@ fn render_tasks_nowrap(
             
             let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
             let title = if task.title.len() > max_width && max_width > 3 {
-                format!("{}...", &task.title[..max_width.saturating_sub(3)])
+                let scrambled_title = scramble_text(&task.title, scramble_mode);
+                format!("{}...", &scrambled_title[..max_width.saturating_sub(3)])
             } else {
-                task.title.clone()
+                scramble_text(&task.title, scramble_mode)
             };
             
             ListItem::new(title).style(style)
@@ -674,6 +698,7 @@ fn render_tasks_wrapped(
     area: Rect,
     day_tasks: &[&Task],
     month_view: &MonthView,
+    scramble_mode: bool,
 ) {
     if day_tasks.is_empty() {
         return;
@@ -682,7 +707,10 @@ fn render_tasks_wrapped(
     // Calculate height for each task based on wrapping
     let task_width = area.width.saturating_sub(1) as usize; // Account for padding
     let task_heights: Vec<u16> = day_tasks.iter()
-        .map(|task| calculate_wrapped_text_height(&task.title, task_width) as u16)
+        .map(|task| {
+            let title_to_measure = scramble_text(&task.title, scramble_mode);
+            calculate_wrapped_text_height(&title_to_measure, task_width) as u16
+        })
         .collect();
     
     // If we have more tasks than can fit, truncate the constraints
@@ -728,7 +756,7 @@ fn render_tasks_wrapped(
             Style::default().fg(Color::White)
         };
         
-        let paragraph = Paragraph::new(task.title.clone())
+        let paragraph = Paragraph::new(scramble_text(&task.title, scramble_mode))
             .style(style)
             .wrap(Wrap { trim: true });
         
