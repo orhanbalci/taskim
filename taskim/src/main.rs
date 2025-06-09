@@ -178,6 +178,43 @@ impl App {
                 self.month_view.prev_year();
                 self.pending_key = None;
                 return Ok(());
+            } else if pending == 'd' && key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
+                // Handle 'dd' - cut the selected task (vim-style)
+                if let Some(task_id) = self.month_view.get_selected_task_id() {
+                    if let Some(task) = self.data.remove_task_and_reorder(&task_id) {
+                        let task_date = task.start.date_naive();
+                        
+                        // Store the cut task for pasting
+                        self.yanked_task = Some(task.clone());
+                        
+                        // Track deletion for undo functionality
+                        self.undo_stack.push(Operation::DeleteTask {
+                            task,
+                            original_date: task_date,
+                        });
+                        
+                        // Check if there are any remaining tasks on the same date
+                        let remaining_tasks = self.data.get_tasks_for_date(task_date);
+                        
+                        if remaining_tasks.is_empty() {
+                            // No more tasks on this day, select the day itself
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Day(task_date),
+                                task_index_in_day: None,
+                            };
+                        } else {
+                            // Select the first remaining task
+                            self.month_view.selection = month_view::Selection {
+                                selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
+                                task_index_in_day: Some(0),
+                            };
+                        }
+                        
+                        self.save()?;
+                    }
+                }
+                self.pending_key = None;
+                return Ok(());
             }
             // If we have a pending key but don't match, clear it and continue with normal processing
             self.pending_key = None;
@@ -240,55 +277,9 @@ impl App {
             // We'll need to track this order for when the task gets created
             self.pending_insert_order = Some(insert_order);
             self.mode = AppMode::TaskEdit(edit_state);
-        } else if key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
-            // Handle 'dd' sequence for cutting tasks (vim-style)
-            if let Some(pending) = self.pending_key {
-                if pending == 'd' {
-                    // Second 'd' in 'dd' sequence - cut the selected task
-                    if let Some(task_id) = self.month_view.get_selected_task_id() {
-                        if let Some(task) = self.data.remove_task_and_reorder(&task_id) {
-                            let task_date = task.start.date_naive();
-                            
-                            // Store the cut task for pasting
-                            self.yanked_task = Some(task.clone());
-                            
-                            // Track deletion for undo functionality
-                            self.undo_stack.push(Operation::DeleteTask {
-                                task,
-                                original_date: task_date,
-                            });
-                            
-                            // Check if there are any remaining tasks on the same date
-                            let remaining_tasks = self.data.get_tasks_for_date(task_date);
-                            
-                            if remaining_tasks.is_empty() {
-                                // No more tasks on this day, select the day itself
-                                self.month_view.selection = month_view::Selection {
-                                    selection_type: month_view::SelectionType::Day(task_date),
-                                    task_index_in_day: None,
-                                };
-                            } else {
-                                // Select the first remaining task
-                                self.month_view.selection = month_view::Selection {
-                                    selection_type: month_view::SelectionType::Task(remaining_tasks[0].id.clone()),
-                                    task_index_in_day: Some(0),
-                                };
-                            }
-                            
-                            self.save()?;
-                        }
-                    }
-                    self.pending_key = None;
-                    return Ok(());
-                } else {
-                    // Clear pending key and continue with normal processing
-                    self.pending_key = None;
-                }
-            } else {
-                // First 'd' in potential 'dd' sequence
-                self.pending_key = Some('d');
-                return Ok(());
-            }
+        } else if KEYBINDINGS.delete_line.matches(key.code, key.modifiers) {
+            // Handle first 'd' for 'dd' sequence
+            self.pending_key = Some('d');
         } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {
             // Delete/cut the selected task (vim-style 'x') - same as 'dd'
             if let Some(task_id) = self.month_view.get_selected_task_id() {
