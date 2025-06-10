@@ -816,12 +816,14 @@ fn render_tasks_wrapped(
             SelectionType::Task(ref task_id) if task_id == &task.id
         );
 
-        let style = if is_selected_task {
+        let style = if is_selected_task && task.completed {
+            Style::default().bg(Color::DarkGray).fg(Color::Green)
+        } else if is_selected_task {
             Style::default()
-                .bg(Color::Yellow)
+                .bg(Color::Gray)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD)
-        } else if task.completed {
+        } else if task.completed && !is_selected_task {
             Style::default().fg(Color::Green)
         } else {
             Style::default().fg(Color::White)
