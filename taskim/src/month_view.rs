@@ -727,7 +727,7 @@ fn render_tasks_nowrap(
             } else if task.completed && !is_selected_task {
                 Style::default().fg(config.ui_colors.completed_task_fg)
             } else {
-                Style::default().fg(config.ui_colors.default_task_fg)
+                Style::default().fg(config.ui_colors.default_fg)
             };
 
             let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
@@ -838,7 +838,7 @@ fn render_tasks_wrapped(
         } else if task.completed && !is_selected_task {
             Style::default().fg(config.ui_colors.completed_task_fg)
         } else {
-            Style::default().fg(config.ui_colors.default_task_fg)
+            Style::default().fg(config.ui_colors.default_fg)
         };
 
         let paragraph = Paragraph::new(

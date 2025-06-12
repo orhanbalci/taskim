@@ -4,6 +4,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::style::Color;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -11,6 +12,7 @@ use std::path::Path;
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigFile {
     pub show_keybinds: Option<bool>,
+    pub colors: Option<HashMap<String, String>>,
 }
 
 // --- Runtime keybinding struct ---
@@ -31,13 +33,14 @@ impl KeyBinding {
 // --- Runtime config struct ---
 #[derive(Debug, Clone)]
 pub struct UiColors {
-    pub selected_task_bg: Color,
+    pub default_fg: Color,
     pub selected_task_fg: Color,
-    pub selected_task_bold: bool,
+    pub selected_task_bg: Color,
+    pub completed_task_fg: Color,
     pub selected_completed_task_bg: Color,
     pub selected_completed_task_fg: Color,
-    pub completed_task_fg: Color,
-    pub default_task_fg: Color,
+    pub selected_task_bold: bool,
+    // Add more fields as needed
 }
 
 #[derive(Debug, Clone)]
@@ -94,14 +97,15 @@ impl Config {
     }
     pub fn from_config_file(file: Option<ConfigFile>) -> Self {
         let show_keybinds = file.as_ref().and_then(|f| f.show_keybinds).unwrap_or(true);
+        let colors = file.as_ref().and_then(|f| f.colors.as_ref()).cloned();
         let ui_colors = UiColors {
-            selected_task_bg: parse_color("Gray"),
-            selected_task_fg: parse_color("Black"),
-            selected_task_bold: true,
-            selected_completed_task_bg: parse_color("DarkGray"),
-            selected_completed_task_fg: parse_color("Green"),
-            completed_task_fg: parse_color("Green"),
-            default_task_fg: parse_color("White"),
+            default_fg: parse_color(&colors, "default_fg", Color::White),
+            selected_task_fg: parse_color(&colors, "selected_task_fg", Color::Black),
+            selected_task_bg: parse_color(&colors, "selected_task_bg", Color::Gray),
+            completed_task_fg: parse_color(&colors, "completed_task_fg", Color::Green),
+            selected_completed_task_bg: parse_color(&colors, "selected_completed_task_bg", Color::DarkGray),
+            selected_completed_task_fg: parse_color(&colors, "selected_completed_task_fg", Color::Green),
+            selected_task_bold: parse_bool(&colors, "selected_task_bold", true),
         };
         Config {
             // Navigation (vim-style by default)
@@ -527,13 +531,13 @@ pub const KEYBINDINGS: Config = Config {
     },
     show_keybinds: true,
     ui_colors: UiColors {
-        selected_task_bg: Color::Gray,
+        default_fg: Color::White,
         selected_task_fg: Color::Black,
-        selected_task_bold: true,
+        selected_task_bg: Color::Gray,
+        completed_task_fg: Color::Green,
         selected_completed_task_bg: Color::DarkGray,
         selected_completed_task_fg: Color::Green,
-        completed_task_fg: Color::Green,
-        default_task_fg: Color::White,
+        selected_task_bold: true,
     },
 };
 
@@ -649,9 +653,14 @@ impl ConfigFile {
     }
 }
 
-// NOTE: Add serde_yaml = "*" to your Cargo.toml dependencies
+fn parse_color(map: &Option<HashMap<String, String>>, key: &str, default: Color) -> Color {
+    map.as_ref()
+        .and_then(|m| m.get(key))
+        .map(|s| parse_color_name(s))
+        .unwrap_or(default)
+}
 
-fn parse_color(name: &str) -> Color {
+fn parse_color_name(name: &str) -> Color {
     match name.to_lowercase().as_str() {
         "black" => Color::Black,
         "red" => Color::Red,
@@ -665,4 +674,11 @@ fn parse_color(name: &str) -> Color {
         "white" => Color::White,
         _ => Color::White,
     }
+}
+
+fn parse_bool(map: &Option<HashMap<String, String>>, key: &str, default: bool) -> bool {
+    map.as_ref()
+        .and_then(|m| m.get(key))
+        .and_then(|s| s.parse::<bool>().ok())
+        .unwrap_or(default)
 }
