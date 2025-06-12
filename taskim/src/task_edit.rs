@@ -2,7 +2,7 @@ use crate::task::Task;
 use chrono::NaiveDate;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
@@ -97,7 +97,10 @@ pub fn render_task_edit_popup(
     frame: &mut Frame,
     area: Rect,
     state: &TaskEditState,
+    config: &crate::config::Config,
 ) {
+    let colors = &config.task_edit_colors;
+
     // Calculate popup area (centered, 60% width, 40% height)
     let popup_area = centered_rect(60, 40, area);
     
@@ -109,7 +112,8 @@ pub fn render_task_edit_popup(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White).bg(Color::Black));
+        .style(Style::default().fg(colors.popup_fg).bg(colors.popup_bg))
+        .border_style(Style::default().fg(colors.border_fg));
     
     let inner_area = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -123,56 +127,56 @@ pub fn render_task_edit_popup(
     
     // Render title field
     let title_style = if state.editing_field == EditingField::Title {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default().fg(colors.title_selected_fg).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(colors.title_fg)
     };
-    
+
     let title_block = Block::default()
         .title("Title")
         .borders(Borders::ALL)
         .border_style(title_style);
-    
+
     let title_paragraph = Paragraph::new(state.title.as_str())
         .block(title_block)
         .style(title_style);
-    
+
     frame.render_widget(title_paragraph, layout[0]);
-    
+
     // Render content field
     let content_style = if state.editing_field == EditingField::Content {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default().fg(colors.content_selected_fg).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(colors.content_fg)
     };
-    
+
     let content_block = Block::default()
         .title("Content")
         .borders(Borders::ALL)
         .border_style(content_style);
-    
+
     let content_paragraph = Paragraph::new(state.content.as_str())
         .block(content_block)
         .style(content_style)
         .wrap(Wrap { trim: true });
-    
+
     frame.render_widget(content_paragraph, layout[1]);
-    
+
     // Render instructions
     let instructions = vec![
         Line::from(vec![
-            Span::styled("Tab", Style::default().fg(Color::Green)),
+            Span::styled("Tab", Style::default().fg(colors.instructions_key_fg)),
             Span::raw(": Switch field | "),
-            Span::styled("Enter", Style::default().fg(Color::Green)),
+            Span::styled("Enter", Style::default().fg(colors.instructions_key_fg)),
             Span::raw(": Save | "),
-            Span::styled("Esc", Style::default().fg(Color::Red)),
+            Span::styled("Esc", Style::default().fg(colors.instructions_key_fg)),
             Span::raw(": Cancel"),
         ])
     ];
-    
+
     let instructions_paragraph = Paragraph::new(instructions)
-        .style(Style::default().fg(Color::Gray));
-    
+        .style(Style::default().fg(colors.instructions_fg));
+
     frame.render_widget(instructions_paragraph, layout[2]);
 }
 

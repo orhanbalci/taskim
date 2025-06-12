@@ -19,7 +19,7 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
-    style::{Color, Style},
+    style::{Style},
     text::{Line, Span},
     widgets::Paragraph,
     DefaultTerminal, Frame,
@@ -883,7 +883,7 @@ impl App {
         // Render mode-specific overlays
         match &self.mode {
             AppMode::TaskEdit(state) => {
-                render_task_edit_popup(frame, area, state);
+                render_task_edit_popup(frame, area, state, &self.config);
             }
             AppMode::Command(_) => {
                 // Command mode is handled in the footer
@@ -896,62 +896,56 @@ impl App {
         match &self.mode {
             AppMode::Command(state) => {
                 if state.show_help {
-                    // Show help information
                     let help_lines = vec![
-                        Line::from(vec![Span::styled(
-                            "Date Navigation Commands:",
-                            Style::default().fg(Color::Yellow),
-                        )]),
                         Line::from(vec![
-                            Span::styled("YYYY", Style::default().fg(Color::Green)),
+                            Span::styled("Date Navigation Commands:", Style::default().fg(self.config.ui_colors.selected_task_fg)),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("YYYY", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Go to year (e.g., 2024) | "),
-                            Span::styled("DD", Style::default().fg(Color::Green)),
+                            Span::styled("DD", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Go to day in current month (e.g., 15)"),
                         ]),
                         Line::from(vec![
-                            Span::styled("MM/DD/YYYY", Style::default().fg(Color::Green)),
+                            Span::styled("MM/DD/YYYY", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Go to specific date (e.g., 06/15/2024)"),
                         ]),
                         Line::from(vec![
-                            Span::styled("Quit Commands:", Style::default().fg(Color::Yellow)),
+                            Span::styled("Quit Commands:", Style::default().fg(self.config.ui_colors.completed_task_fg)),
                             Span::raw(" "),
-                            Span::styled(":q", Style::default().fg(Color::Green)),
+                            Span::styled(":q", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Quit | "),
-                            Span::styled(":wq", Style::default().fg(Color::Green)),
+                            Span::styled(":wq", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Save & quit | "),
-                            Span::styled(":q!", Style::default().fg(Color::Green)),
+                            Span::styled(":q!", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Force quit"),
                         ]),
                         Line::from(vec![
-                            Span::styled("Display Commands:", Style::default().fg(Color::Yellow)),
+                            Span::styled("Display Commands:", Style::default().fg(self.config.ui_colors.completed_task_fg)),
                             Span::raw(" "),
-                            Span::styled(":set wrap", Style::default().fg(Color::Green)),
+                            Span::styled(":set wrap", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Enable text wrapping | "),
-                            Span::styled(":set nowrap", Style::default().fg(Color::Green)),
+                            Span::styled(":set nowrap", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Disable text wrapping"),
                         ]),
                         Line::from(vec![
-                            Span::styled(":help", Style::default().fg(Color::Cyan)),
+                            Span::styled(":help", Style::default().fg(self.config.ui_colors.selected_completed_task_fg)),
                             Span::raw(" - Toggle this help | "),
-                            Span::styled("Esc", Style::default().fg(Color::Red)),
+                            Span::styled("Esc", Style::default().fg(self.config.ui_colors.selected_completed_task_bg)),
                             Span::raw(" - Exit command mode"),
                         ]),
                     ];
-
                     let help_paragraph = Paragraph::new(help_lines)
-                        .style(Style::default().fg(Color::White).bg(Color::Black));
+                        .style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(help_paragraph, area);
                 } else {
-                    // Render command line like vim
                     let command_line = format!(":{}", state.input);
                     let command_paragraph = Paragraph::new(command_line.as_str())
-                        .style(Style::default().fg(Color::White).bg(Color::Black));
+                        .style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(command_paragraph, area);
-
-                    // Set cursor position at the end of the command
                     frame.set_cursor_position(Position::new(
-                        area.x + 1 + state.cursor_position as u16, // +1 for the ':' character
-                        area.y,
+                        area.x + 1 + state.cursor_position as u16,
+                        area.y
                     ));
                 }
             }
@@ -959,21 +953,22 @@ impl App {
                 if self.show_keybinds {
                     let spans = self.config.get_normal_mode_help_spans(
                         self.undo_stack.can_undo(),
-                        self.undo_stack.can_redo(),
+                        self.undo_stack.can_redo()
                     );
                     let help_text = vec![Line::from(spans)];
-                    let footer = Paragraph::new(help_text).style(Style::default().fg(Color::Gray));
+                    let footer = Paragraph::new(help_text)
+                        .style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(footer, area);
                 } else {
-                    // Show minimal footer
-                    let footer = Paragraph::new("").style(Style::default().fg(Color::Gray));
+                    let footer = Paragraph::new("").style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(footer, area);
                 }
             }
             AppMode::TaskEdit(_) => {
                 let spans = self.config.get_edit_mode_help_spans();
                 let help_text = vec![Line::from(spans)];
-                let footer = Paragraph::new(help_text).style(Style::default().fg(Color::Gray));
+                let footer = Paragraph::new(help_text)
+                    .style(Style::default().fg(self.config.ui_colors.default_fg));
                 frame.render_widget(footer, area);
             }
         }

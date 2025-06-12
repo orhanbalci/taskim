@@ -13,6 +13,7 @@ use std::path::Path;
 pub struct ConfigFile {
     pub show_keybinds: Option<bool>,
     pub colors: Option<HashMap<String, String>>,
+    pub task_edit_colors: Option<HashMap<String, String>>,
 }
 
 // --- Runtime keybinding struct ---
@@ -41,6 +42,20 @@ pub struct UiColors {
     pub selected_completed_task_fg: Color,
     pub selected_task_bold: bool,
     // Add more fields as needed
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskEditColors {
+    pub popup_bg: Color,
+    pub popup_fg: Color,
+    pub border_fg: Color,
+    pub border_selected_fg: Color,
+    pub title_fg: Color,
+    pub title_selected_fg: Color,
+    pub content_fg: Color,
+    pub content_selected_fg: Color,
+    pub instructions_fg: Color,
+    pub instructions_key_fg: Color,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +103,7 @@ pub struct Config {
     // New config fields
     pub show_keybinds: bool,
     pub ui_colors: UiColors,
+    pub task_edit_colors: TaskEditColors,
 }
 
 impl Config {
@@ -98,14 +114,50 @@ impl Config {
     pub fn from_config_file(file: Option<ConfigFile>) -> Self {
         let show_keybinds = file.as_ref().and_then(|f| f.show_keybinds).unwrap_or(true);
         let colors = file.as_ref().and_then(|f| f.colors.as_ref()).cloned();
+        let task_edit_colors_map = file
+            .as_ref()
+            .and_then(|f| f.task_edit_colors.as_ref())
+            .cloned();
         let ui_colors = UiColors {
             default_fg: parse_color(&colors, "default_fg", Color::White),
             selected_task_fg: parse_color(&colors, "selected_task_fg", Color::Black),
             selected_task_bg: parse_color(&colors, "selected_task_bg", Color::Gray),
             completed_task_fg: parse_color(&colors, "completed_task_fg", Color::Green),
-            selected_completed_task_bg: parse_color(&colors, "selected_completed_task_bg", Color::DarkGray),
-            selected_completed_task_fg: parse_color(&colors, "selected_completed_task_fg", Color::Green),
+            selected_completed_task_bg: parse_color(
+                &colors,
+                "selected_completed_task_bg",
+                Color::DarkGray,
+            ),
+            selected_completed_task_fg: parse_color(
+                &colors,
+                "selected_completed_task_fg",
+                Color::Green,
+            ),
             selected_task_bold: parse_bool(&colors, "selected_task_bold", true),
+        };
+        let task_edit_colors = TaskEditColors {
+            popup_bg: parse_color(&task_edit_colors_map, "popup_bg", Color::Black),
+            popup_fg: parse_color(&task_edit_colors_map, "popup_fg", Color::White),
+            border_fg: parse_color(&task_edit_colors_map, "border_fg", Color::White),
+            border_selected_fg: parse_color(
+                &task_edit_colors_map,
+                "border_selected_fg",
+                Color::Blue,
+            ),
+            title_fg: parse_color(&task_edit_colors_map, "title_fg", Color::White),
+            title_selected_fg: parse_color(&task_edit_colors_map, "title_selected_fg", Color::Blue),
+            content_fg: parse_color(&task_edit_colors_map, "content_fg", Color::White),
+            content_selected_fg: parse_color(
+                &task_edit_colors_map,
+                "content_selected_fg",
+                Color::Blue,
+            ),
+            instructions_fg: parse_color(&task_edit_colors_map, "instructions_fg", Color::Gray),
+            instructions_key_fg: parse_color(
+                &task_edit_colors_map,
+                "instructions_key_fg",
+                Color::Blue,
+            ),
         };
         Config {
             // Navigation (vim-style by default)
@@ -315,6 +367,7 @@ impl Config {
             },
             show_keybinds,
             ui_colors,
+            task_edit_colors,
         }
     }
 }
@@ -538,6 +591,18 @@ pub const KEYBINDINGS: Config = Config {
         selected_completed_task_bg: Color::DarkGray,
         selected_completed_task_fg: Color::Green,
         selected_task_bold: true,
+    },
+    task_edit_colors: TaskEditColors {
+        popup_bg: Color::Black,
+        popup_fg: Color::White,
+        border_fg: Color::White,
+        border_selected_fg: Color::Blue,
+        title_fg: Color::White,
+        title_selected_fg: Color::Blue,
+        content_fg: Color::White,
+        content_selected_fg: Color::Blue,
+        instructions_fg: Color::Gray,
+        instructions_key_fg: Color::Blue,
     },
 };
 

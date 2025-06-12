@@ -3,7 +3,7 @@ use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
@@ -525,7 +525,7 @@ pub fn render_month_view(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::Gray).bg(Color::Black));
+        .style(Style::default().fg(config.ui_colors.selected_task_bg).bg(config.ui_colors.default_fg));
 
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
@@ -636,17 +636,17 @@ fn render_day_cell(
 
     // Day style
     let day_style = if is_selected_day {
-        Style::default().bg(Color::Blue).fg(Color::White)
+        Style::default().bg(config.ui_colors.selected_task_bg).fg(config.ui_colors.selected_task_fg)
     } else if !is_current_month {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(config.ui_colors.selected_completed_task_bg)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(config.ui_colors.default_fg)
     };
 
     let border_style = if is_selected_day {
-        Style::default().fg(Color::Blue)
+        Style::default().fg(config.ui_colors.selected_task_bg)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(config.ui_colors.selected_completed_task_bg)
     };
 
     let block = Block::default()
@@ -752,7 +752,7 @@ fn render_tasks_nowrap(
         })
         .collect();
 
-    let task_list = List::new(task_items).style(Style::default().fg(Color::White));
+    let task_list = List::new(task_items).style(Style::default().fg(config.ui_colors.default_fg));
 
     frame.render_widget(task_list, area);
 }

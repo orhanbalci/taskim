@@ -17,6 +17,19 @@ colors:
   default_bg: "Black"
   default_fg: "White"
 
+# Task Edit Popup Colors (use ratatui color names)
+task_edit_colors:
+  popup_bg: "Black"
+  popup_fg: "White"
+  border_fg: "White"
+  border_selected_fg: "Blue"
+  title_fg: "White"
+  title_selected_fg: "Blue"
+  content_fg: "White"
+  content_selected_fg: "Blue"
+  instructions_fg: "Gray"
+  instructions_key_fg: "Blue"
+
 # Keybindings (use string format, e.g. 'h', 'j', 'k', 'l', 'Ctrl+r', 'Esc')
 keybindings:
   move_left: "h"
