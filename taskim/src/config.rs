@@ -4,6 +4,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::style::Color;
 use serde::Deserialize;
+use serde_yaml::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -14,6 +15,7 @@ pub struct ConfigFile {
     pub show_keybinds: Option<bool>,
     pub colors: Option<HashMap<String, String>>,
     pub task_edit_colors: Option<HashMap<String, String>>,
+    pub keybindings: Option<HashMap<String, serde_yaml::Value>>,
 }
 
 // --- Runtime keybinding struct ---
@@ -21,7 +23,7 @@ pub struct ConfigFile {
 pub struct KeyBinding {
     pub key: KeyCode,
     pub modifiers: KeyModifiers,
-    pub description: &'static str,
+    pub description: String,
     pub color: Color,
 }
 
@@ -121,6 +123,14 @@ impl Config {
             .as_ref()
             .and_then(|f| f.task_edit_colors.as_ref())
             .cloned();
+        let keybindings_yaml = file.as_ref().and_then(|f| f.keybindings.as_ref());
+        // Build default keybindings as a HashMap
+        let default_keybindings = default_keybindings();
+        let mut keybindings_map = std::collections::HashMap::new();
+        for (name, default) in default_keybindings.iter() {
+            let yaml_val = keybindings_yaml.and_then(|m| m.get(*name));
+            keybindings_map.insert(*name, parse_keybinding(yaml_val, default));
+        }
         let ui_colors = UiColors {
             default_fg: parse_color(&colors, "default_fg", Color::White),
             default_bg: parse_color(&colors, "default_bg", Color::Black),
@@ -166,473 +176,43 @@ impl Config {
             ),
         };
         Config {
-            // Navigation (vim-style by default)
-            move_left: KeyBinding {
-                key: KeyCode::Char('h'),
-                modifiers: KeyModifiers::NONE,
-                description: "Move",
-                color: Color::Green,
-            },
-            move_down: KeyBinding {
-                key: KeyCode::Char('j'),
-                modifiers: KeyModifiers::NONE,
-                description: "Move",
-                color: Color::Green,
-            },
-            move_up: KeyBinding {
-                key: KeyCode::Char('k'),
-                modifiers: KeyModifiers::NONE,
-                description: "Move",
-                color: Color::Green,
-            },
-            move_right: KeyBinding {
-                key: KeyCode::Char('l'),
-                modifiers: KeyModifiers::NONE,
-                description: "Move",
-                color: Color::Green,
-            },
-
-            // Task operations
-            insert_edit: KeyBinding {
-                key: KeyCode::Char('i'),
-                modifiers: KeyModifiers::NONE,
-                description: "Insert/Edit",
-                color: Color::Green,
-            },
-            insert_above: KeyBinding {
-                key: KeyCode::Char('O'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Insert Above",
-                color: Color::Green,
-            },
-            insert_below: KeyBinding {
-                key: KeyCode::Char('o'),
-                modifiers: KeyModifiers::NONE,
-                description: "Insert Below",
-                color: Color::Green,
-            },
-            delete: KeyBinding {
-                key: KeyCode::Char('x'),
-                modifiers: KeyModifiers::NONE,
-                description: "Delete",
-                color: Color::Red,
-            },
-            delete_line: KeyBinding {
-                key: KeyCode::Char('d'),
-                modifiers: KeyModifiers::NONE,
-                description: "Cut Task (dd)",
-                color: Color::Red,
-            },
-            toggle_complete: KeyBinding {
-                key: KeyCode::Char('c'),
-                modifiers: KeyModifiers::NONE,
-                description: "Toggle Complete",
-                color: Color::Blue,
-            },
-
-            // Yank/Paste (vim-style)
-            yank: KeyBinding {
-                key: KeyCode::Char('y'),
-                modifiers: KeyModifiers::NONE,
-                description: "Yank (Copy)",
-                color: Color::Yellow,
-            },
-            paste: KeyBinding {
-                key: KeyCode::Char('p'),
-                modifiers: KeyModifiers::NONE,
-                description: "Paste",
-                color: Color::Yellow,
-            },
-            paste_above: KeyBinding {
-                key: KeyCode::Char('P'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Paste Above",
-                color: Color::Yellow,
-            },
-
-            // Undo/Redo
-            undo: KeyBinding {
-                key: KeyCode::Char('u'),
-                modifiers: KeyModifiers::NONE,
-                description: "Undo",
-                color: Color::Magenta,
-            },
-            redo: KeyBinding {
-                key: KeyCode::Char('r'),
-                modifiers: KeyModifiers::CONTROL,
-                description: "Redo",
-                color: Color::Magenta,
-            },
-
-            // Month/Year navigation (vim-style)
-            next_month: KeyBinding {
-                key: KeyCode::Char('L'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Next Month",
-                color: Color::Cyan,
-            },
-            prev_month: KeyBinding {
-                key: KeyCode::Char('H'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Prev Month",
-                color: Color::Cyan,
-            },
-            next_year: KeyBinding {
-                key: KeyCode::Char('G'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Last Year",
-                color: Color::Cyan,
-            },
-            prev_year: KeyBinding {
-                key: KeyCode::Char('g'),
-                modifiers: KeyModifiers::NONE,
-                description: "First Year (gg)",
-                color: Color::Cyan,
-            },
-
-            // Week navigation (vim-style)
-            next_week: KeyBinding {
-                key: KeyCode::Char('w'),
-                modifiers: KeyModifiers::NONE,
-                description: "Next Week",
-                color: Color::Blue,
-            },
-            prev_week: KeyBinding {
-                key: KeyCode::Char('b'),
-                modifiers: KeyModifiers::NONE,
-                description: "Previous Week",
-                color: Color::Blue,
-            },
-
-            // Day navigation (vim-style)
-            first_day_of_month: KeyBinding {
-                key: KeyCode::Char('0'),
-                modifiers: KeyModifiers::NONE,
-                description: "First Day",
-                color: Color::Blue,
-            },
-            last_day_of_month: KeyBinding {
-                key: KeyCode::Char('$'),
-                modifiers: KeyModifiers::SHIFT,
-                description: "Last Day",
-                color: Color::Blue,
-            },
-
-            // Go to today
-            go_to_today: KeyBinding {
-                key: KeyCode::Char('t'),
-                modifiers: KeyModifiers::NONE,
-                description: "Go to Today",
-                color: Color::Magenta,
-            },
-
-            // Task editing
-            save_task: KeyBinding {
-                key: KeyCode::Enter,
-                modifiers: KeyModifiers::NONE,
-                description: "Save",
-                color: Color::Green,
-            },
-            cancel_edit: KeyBinding {
-                key: KeyCode::Esc,
-                modifiers: KeyModifiers::NONE,
-                description: "Cancel",
-                color: Color::Red,
-            },
-            switch_field: KeyBinding {
-                key: KeyCode::Tab,
-                modifiers: KeyModifiers::NONE,
-                description: "Switch Field",
-                color: Color::Green,
-            },
-            backspace: KeyBinding {
-                key: KeyCode::Backspace,
-                modifiers: KeyModifiers::NONE,
-                description: "Delete Char",
-                color: Color::Gray,
-            },
-
-            // App control
-            quit: KeyBinding {
-                key: KeyCode::Char('q'),
-                modifiers: KeyModifiers::NONE,
-                description: "Quit",
-                color: Color::Red,
-            },
-            quit_alt: KeyBinding {
-                key: KeyCode::Esc,
-                modifiers: KeyModifiers::NONE,
-                description: "Quit",
-                color: Color::Red,
-            },
-            force_quit: KeyBinding {
-                key: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                description: "Force Quit",
-                color: Color::Red,
-            },
+            move_left: keybindings_map["move_left"].clone(),
+            move_down: keybindings_map["move_down"].clone(),
+            move_up: keybindings_map["move_up"].clone(),
+            move_right: keybindings_map["move_right"].clone(),
+            insert_edit: keybindings_map["insert_edit"].clone(),
+            insert_above: keybindings_map["insert_above"].clone(),
+            insert_below: keybindings_map["insert_below"].clone(),
+            delete: keybindings_map["delete"].clone(),
+            delete_line: keybindings_map["delete_line"].clone(),
+            toggle_complete: keybindings_map["toggle_complete"].clone(),
+            yank: keybindings_map["yank"].clone(),
+            paste: keybindings_map["paste"].clone(),
+            paste_above: keybindings_map["paste_above"].clone(),
+            undo: keybindings_map["undo"].clone(),
+            redo: keybindings_map["redo"].clone(),
+            next_month: keybindings_map["next_month"].clone(),
+            prev_month: keybindings_map["prev_month"].clone(),
+            next_year: keybindings_map["next_year"].clone(),
+            prev_year: keybindings_map["prev_year"].clone(),
+            next_week: keybindings_map["next_week"].clone(),
+            prev_week: keybindings_map["prev_week"].clone(),
+            first_day_of_month: keybindings_map["first_day_of_month"].clone(),
+            last_day_of_month: keybindings_map["last_day_of_month"].clone(),
+            go_to_today: keybindings_map["go_to_today"].clone(),
+            save_task: keybindings_map["save_task"].clone(),
+            cancel_edit: keybindings_map["cancel_edit"].clone(),
+            switch_field: keybindings_map["switch_field"].clone(),
+            backspace: keybindings_map["backspace"].clone(),
+            quit: keybindings_map["quit"].clone(),
+            quit_alt: keybindings_map["quit_alt"].clone(),
+            force_quit: keybindings_map["force_quit"].clone(),
             show_keybinds,
             ui_colors,
             task_edit_colors,
         }
     }
 }
-
-// ============================================================================
-// CUSTOMIZE YOUR KEYBINDINGS HERE
-// ============================================================================
-
-pub const KEYBINDINGS: Config = Config {
-    // Navigation (vim-style by default)
-    move_left: KeyBinding {
-        key: KeyCode::Char('h'),
-        modifiers: KeyModifiers::NONE,
-        description: "Move",
-        color: Color::Green,
-    },
-    move_down: KeyBinding {
-        key: KeyCode::Char('j'),
-        modifiers: KeyModifiers::NONE,
-        description: "Move",
-        color: Color::Green,
-    },
-    move_up: KeyBinding {
-        key: KeyCode::Char('k'),
-        modifiers: KeyModifiers::NONE,
-        description: "Move",
-        color: Color::Green,
-    },
-    move_right: KeyBinding {
-        key: KeyCode::Char('l'),
-        modifiers: KeyModifiers::NONE,
-        description: "Move",
-        color: Color::Green,
-    },
-
-    // Task operations
-    insert_edit: KeyBinding {
-        key: KeyCode::Char('i'),
-        modifiers: KeyModifiers::NONE,
-        description: "Insert/Edit",
-        color: Color::Green,
-    },
-    insert_above: KeyBinding {
-        key: KeyCode::Char('O'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Insert Above",
-        color: Color::Green,
-    },
-    insert_below: KeyBinding {
-        key: KeyCode::Char('o'),
-        modifiers: KeyModifiers::NONE,
-        description: "Insert Below",
-        color: Color::Green,
-    },
-    delete: KeyBinding {
-        key: KeyCode::Char('x'),
-        modifiers: KeyModifiers::NONE,
-        description: "Delete",
-        color: Color::Red,
-    },
-    delete_line: KeyBinding {
-        key: KeyCode::Char('d'),
-        modifiers: KeyModifiers::NONE,
-        description: "Cut Task (dd)",
-        color: Color::Red,
-    },
-    toggle_complete: KeyBinding {
-        key: KeyCode::Char('c'),
-        modifiers: KeyModifiers::NONE,
-        description: "Toggle Complete",
-        color: Color::Blue,
-    },
-
-    // Yank/Paste (vim-style)
-    yank: KeyBinding {
-        key: KeyCode::Char('y'),
-        modifiers: KeyModifiers::NONE,
-        description: "Yank (Copy)",
-        color: Color::Yellow,
-    },
-    paste: KeyBinding {
-        key: KeyCode::Char('p'),
-        modifiers: KeyModifiers::NONE,
-        description: "Paste",
-        color: Color::Yellow,
-    },
-    paste_above: KeyBinding {
-        key: KeyCode::Char('P'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Paste Above",
-        color: Color::Yellow,
-    },
-
-    // Undo/Redo
-    undo: KeyBinding {
-        key: KeyCode::Char('u'),
-        modifiers: KeyModifiers::NONE,
-        description: "Undo",
-        color: Color::Magenta,
-    },
-    redo: KeyBinding {
-        key: KeyCode::Char('r'),
-        modifiers: KeyModifiers::CONTROL,
-        description: "Redo",
-        color: Color::Magenta,
-    },
-
-    // Month/Year navigation (vim-style)
-    next_month: KeyBinding {
-        key: KeyCode::Char('L'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Next Month",
-        color: Color::Cyan,
-    },
-    prev_month: KeyBinding {
-        key: KeyCode::Char('H'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Prev Month",
-        color: Color::Cyan,
-    },
-    next_year: KeyBinding {
-        key: KeyCode::Char('G'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Last Year",
-        color: Color::Cyan,
-    },
-    prev_year: KeyBinding {
-        key: KeyCode::Char('g'),
-        modifiers: KeyModifiers::NONE,
-        description: "First Year (gg)",
-        color: Color::Cyan,
-    },
-
-    // Week navigation (vim-style)
-    next_week: KeyBinding {
-        key: KeyCode::Char('w'),
-        modifiers: KeyModifiers::NONE,
-        description: "Next Week",
-        color: Color::Blue,
-    },
-    prev_week: KeyBinding {
-        key: KeyCode::Char('b'),
-        modifiers: KeyModifiers::NONE,
-        description: "Previous Week",
-        color: Color::Blue,
-    },
-
-    // Day navigation (vim-style)
-    first_day_of_month: KeyBinding {
-        key: KeyCode::Char('0'),
-        modifiers: KeyModifiers::NONE,
-        description: "First Day",
-        color: Color::Blue,
-    },
-    last_day_of_month: KeyBinding {
-        key: KeyCode::Char('$'),
-        modifiers: KeyModifiers::SHIFT,
-        description: "Last Day",
-        color: Color::Blue,
-    },
-
-    // Go to today
-    go_to_today: KeyBinding {
-        key: KeyCode::Char('t'),
-        modifiers: KeyModifiers::NONE,
-        description: "Go to Today",
-        color: Color::Magenta,
-    },
-
-    // Task editing
-    save_task: KeyBinding {
-        key: KeyCode::Enter,
-        modifiers: KeyModifiers::NONE,
-        description: "Save",
-        color: Color::Green,
-    },
-    cancel_edit: KeyBinding {
-        key: KeyCode::Esc,
-        modifiers: KeyModifiers::NONE,
-        description: "Cancel",
-        color: Color::Red,
-    },
-    switch_field: KeyBinding {
-        key: KeyCode::Tab,
-        modifiers: KeyModifiers::NONE,
-        description: "Switch Field",
-        color: Color::Green,
-    },
-    backspace: KeyBinding {
-        key: KeyCode::Backspace,
-        modifiers: KeyModifiers::NONE,
-        description: "Delete Char",
-        color: Color::Gray,
-    },
-
-    // App control
-    quit: KeyBinding {
-        key: KeyCode::Char('q'),
-        modifiers: KeyModifiers::NONE,
-        description: "Quit",
-        color: Color::Red,
-    },
-    quit_alt: KeyBinding {
-        key: KeyCode::Esc,
-        modifiers: KeyModifiers::NONE,
-        description: "Quit",
-        color: Color::Red,
-    },
-    force_quit: KeyBinding {
-        key: KeyCode::Char('c'),
-        modifiers: KeyModifiers::CONTROL,
-        description: "Force Quit",
-        color: Color::Red,
-    },
-    show_keybinds: true,
-    ui_colors: UiColors {
-        default_fg: Color::White,
-        default_bg: Color::Black,
-        default_task_fg: Color::White,
-        day_number_fg: Color::White,
-        selected_task_fg: Color::Black,
-        selected_task_bg: Color::Gray,
-        completed_task_fg: Color::Green,
-        selected_completed_task_bg: Color::DarkGray,
-        selected_completed_task_fg: Color::Green,
-        selected_task_bold: true,
-    },
-    task_edit_colors: TaskEditColors {
-        popup_bg: Color::Black,
-        popup_fg: Color::White,
-        border_fg: Color::White,
-        border_selected_fg: Color::Blue,
-        title_fg: Color::White,
-        title_selected_fg: Color::Blue,
-        content_fg: Color::White,
-        content_selected_fg: Color::Blue,
-        instructions_fg: Color::Gray,
-        instructions_key_fg: Color::Blue,
-    },
-};
-
-// ============================================================================
-// EXAMPLES - To customize, edit the KEYBINDINGS constant above
-// ============================================================================
-//
-// To change navigation to arrow keys, replace the movement bindings:
-//   move_left: KeyBinding { key: KeyCode::Left, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//   move_down: KeyBinding { key: KeyCode::Down, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//   move_up: KeyBinding { key: KeyCode::Up, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//   move_right: KeyBinding { key: KeyCode::Right, modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
-//
-// To change delete key from 'x' to 'd':
-//   delete: KeyBinding { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
-//
-// To add Ctrl modifier:
-//   some_key: KeyBinding { key: KeyCode::Char('s'), modifiers: KeyModifiers::CONTROL, description: "Save", color: Color::Green },
-//
-// To add Shift modifier:
-//   some_key: KeyBinding { key: KeyCode::Char('S'), modifiers: KeyModifiers::SHIFT, description: "Save All", color: Color::Green },
 
 // Helper functions for UI
 impl Config {
@@ -759,4 +339,350 @@ fn parse_bool(map: &&Option<HashMap<String, String>>, key: &str, default: bool) 
         .and_then(|m| m.get(key))
         .and_then(|s| s.parse::<bool>().ok())
         .unwrap_or(default)
+}
+
+fn parse_keybinding(yaml: Option<&Value>, default: &KeyBinding) -> KeyBinding {
+    match yaml {
+        Some(Value::String(s)) => {
+            // Only key is overridden
+            KeyBinding {
+                key: parse_key_code(s),
+                ..default.clone()
+            }
+        }
+        Some(Value::Sequence(seq)) => {
+            let key = seq
+                .get(0)
+                .and_then(|v| v.as_str())
+                .map(parse_key_code)
+                .unwrap_or(default.key);
+            let modifiers = seq
+                .get(1)
+                .and_then(|v| v.as_str())
+                .map(parse_modifiers)
+                .unwrap_or(default.modifiers);
+            let description = seq
+                .get(2)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| default.description.clone());
+            let color = seq
+                .get(3)
+                .and_then(|v| v.as_str())
+                .map(|c| parse_color_name(c))
+                .unwrap_or(default.color);
+            KeyBinding {
+                key,
+                modifiers,
+                description,
+                color,
+            }
+        }
+        _ => default.clone(),
+    }
+}
+
+fn parse_key_code(s: &str) -> KeyCode {
+    match s.to_lowercase().as_str() {
+        "enter" => KeyCode::Enter,
+        "esc" | "escape" => KeyCode::Esc,
+        "tab" => KeyCode::Tab,
+        "backspace" => KeyCode::Backspace,
+        "$" => KeyCode::Char('$'),
+        _ if s.len() == 1 => KeyCode::Char(s.chars().next().unwrap()),
+        _ => KeyCode::Null,
+    }
+}
+
+fn parse_modifiers(s: &str) -> KeyModifiers {
+    match s.to_uppercase().as_str() {
+        "SHIFT" => KeyModifiers::SHIFT,
+        "CTRL" | "CONTROL" => KeyModifiers::CONTROL,
+        "ALT" => KeyModifiers::ALT,
+        _ => KeyModifiers::NONE,
+    }
+}
+
+fn default_keybindings() -> std::collections::HashMap<&'static str, KeyBinding> {
+    let mut map = std::collections::HashMap::new();
+    map.insert(
+        "move_left",
+        KeyBinding {
+            key: KeyCode::Char('h'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Move"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "move_down",
+        KeyBinding {
+            key: KeyCode::Char('j'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Move"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "move_up",
+        KeyBinding {
+            key: KeyCode::Char('k'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Move"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "move_right",
+        KeyBinding {
+            key: KeyCode::Char('l'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Move"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "insert_edit",
+        KeyBinding {
+            key: KeyCode::Char('i'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Insert/Edit"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "insert_above",
+        KeyBinding {
+            key: KeyCode::Char('O'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Insert Above"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "insert_below",
+        KeyBinding {
+            key: KeyCode::Char('o'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Insert Below"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "delete",
+        KeyBinding {
+            key: KeyCode::Char('x'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Delete"),
+            color: Color::Red,
+        },
+    );
+    map.insert(
+        "delete_line",
+        KeyBinding {
+            key: KeyCode::Char('d'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Cut Task (dd)"),
+            color: Color::Red,
+        },
+    );
+    map.insert(
+        "toggle_complete",
+        KeyBinding {
+            key: KeyCode::Char('c'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Toggle Complete"),
+            color: Color::Blue,
+        },
+    );
+    map.insert(
+        "yank",
+        KeyBinding {
+            key: KeyCode::Char('y'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Yank (Copy)"),
+            color: Color::Yellow,
+        },
+    );
+    map.insert(
+        "paste",
+        KeyBinding {
+            key: KeyCode::Char('p'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Paste"),
+            color: Color::Yellow,
+        },
+    );
+    map.insert(
+        "paste_above",
+        KeyBinding {
+            key: KeyCode::Char('P'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Paste Above"),
+            color: Color::Yellow,
+        },
+    );
+    map.insert(
+        "undo",
+        KeyBinding {
+            key: KeyCode::Char('u'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Undo"),
+            color: Color::Magenta,
+        },
+    );
+    map.insert(
+        "redo",
+        KeyBinding {
+            key: KeyCode::Char('r'),
+            modifiers: KeyModifiers::CONTROL,
+            description: String::from("Redo"),
+            color: Color::Magenta,
+        },
+    );
+    map.insert(
+        "next_month",
+        KeyBinding {
+            key: KeyCode::Char('L'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Next Month"),
+            color: Color::Cyan,
+        },
+    );
+    map.insert(
+        "prev_month",
+        KeyBinding {
+            key: KeyCode::Char('H'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Prev Month"),
+            color: Color::Cyan,
+        },
+    );
+    map.insert(
+        "next_year",
+        KeyBinding {
+            key: KeyCode::Char('G'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Last Year"),
+            color: Color::Cyan,
+        },
+    );
+    map.insert(
+        "prev_year",
+        KeyBinding {
+            key: KeyCode::Char('g'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("First Year (gg)"),
+            color: Color::Cyan,
+        },
+    );
+    map.insert(
+        "next_week",
+        KeyBinding {
+            key: KeyCode::Char('w'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Next Week"),
+            color: Color::Blue,
+        },
+    );
+    map.insert(
+        "prev_week",
+        KeyBinding {
+            key: KeyCode::Char('b'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Previous Week"),
+            color: Color::Blue,
+        },
+    );
+    map.insert(
+        "first_day_of_month",
+        KeyBinding {
+            key: KeyCode::Char('0'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("First Day"),
+            color: Color::Blue,
+        },
+    );
+    map.insert(
+        "last_day_of_month",
+        KeyBinding {
+            key: KeyCode::Char('$'),
+            modifiers: KeyModifiers::SHIFT,
+            description: String::from("Last Day"),
+            color: Color::Blue,
+        },
+    );
+    map.insert(
+        "go_to_today",
+        KeyBinding {
+            key: KeyCode::Char('t'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Go to Today"),
+            color: Color::Magenta,
+        },
+    );
+    map.insert(
+        "save_task",
+        KeyBinding {
+            key: KeyCode::Enter,
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Save"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "cancel_edit",
+        KeyBinding {
+            key: KeyCode::Esc,
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Cancel"),
+            color: Color::Red,
+        },
+    );
+    map.insert(
+        "switch_field",
+        KeyBinding {
+            key: KeyCode::Tab,
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Switch Field"),
+            color: Color::Green,
+        },
+    );
+    map.insert(
+        "backspace",
+        KeyBinding {
+            key: KeyCode::Backspace,
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Delete Char"),
+            color: Color::Gray,
+        },
+    );
+    map.insert(
+        "quit",
+        KeyBinding {
+            key: KeyCode::Char('q'),
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Quit"),
+            color: Color::Red,
+        },
+    );
+    map.insert(
+        "quit_alt",
+        KeyBinding {
+            key: KeyCode::Esc,
+            modifiers: KeyModifiers::NONE,
+            description: String::from("Quit"),
+            color: Color::Red,
+        },
+    );
+    map.insert(
+        "force_quit",
+        KeyBinding {
+            key: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            description: String::from("Force Quit"),
+            color: Color::Red,
+        },
+    );
+    map
 }

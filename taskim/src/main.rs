@@ -6,7 +6,6 @@ mod task_edit;
 mod undo;
 mod utils;
 
-use crate::config::KEYBINDINGS;
 use crate::data::{load_data, save_data};
 use crate::month_view::{render_month_view, MonthView, SelectionType};
 use crate::task::TaskData;
@@ -638,17 +637,17 @@ impl App {
         key: crossterm::event::KeyEvent,
         state: &mut TaskEditState,
     ) -> Result<bool> {
-        if KEYBINDINGS.cancel_edit.matches(key.code, key.modifiers) {
+        if self.config.cancel_edit.matches(key.code, key.modifiers) {
             // Cancel edit
             return Ok(true);
-        } else if KEYBINDINGS.save_task.matches(key.code, key.modifiers) {
+        } else if self.config.save_task.matches(key.code, key.modifiers) {
             // Save task
             if !state.title.trim().is_empty() {
                 return Ok(true);
             }
-        } else if KEYBINDINGS.switch_field.matches(key.code, key.modifiers) {
+        } else if self.config.switch_field.matches(key.code, key.modifiers) {
             state.switch_field();
-        } else if KEYBINDINGS.backspace.matches(key.code, key.modifiers) {
+        } else if self.config.backspace.matches(key.code, key.modifiers) {
             state.remove_char();
         } else if let KeyCode::Char(ch) = key.code {
             state.add_char(ch);

@@ -3,7 +3,7 @@ use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color,Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
