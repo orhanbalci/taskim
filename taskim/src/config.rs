@@ -3,7 +3,17 @@
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::style::Color;
+use serde::Deserialize;
+use std::fs;
+use std::path::Path;
 
+// --- YAML config file struct ---
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfigFile {
+    pub show_keybinds: Option<bool>,
+}
+
+// --- Runtime keybinding struct ---
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyBinding {
     pub key: KeyCode,
@@ -18,6 +28,18 @@ impl KeyBinding {
     }
 }
 
+// --- Runtime config struct ---
+#[derive(Debug, Clone)]
+pub struct UiColors {
+    pub selected_task_bg: Color,
+    pub selected_task_fg: Color,
+    pub selected_task_bold: bool,
+    pub selected_completed_task_bg: Color,
+    pub selected_completed_task_fg: Color,
+    pub completed_task_fg: Color,
+    pub default_task_fg: Color,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     // Navigation
@@ -25,49 +47,117 @@ pub struct Config {
     pub move_down: KeyBinding,
     pub move_up: KeyBinding,
     pub move_right: KeyBinding,
-    
     // Task operations
     pub insert_edit: KeyBinding,
-    pub insert_above: KeyBinding,    // 'O' - insert task above current
-    pub insert_below: KeyBinding,    // 'o' - insert task below current
+    pub insert_above: KeyBinding,
+    pub insert_below: KeyBinding,
     pub delete: KeyBinding,
-    pub delete_line: KeyBinding,     // 'dd' - cut task (same as delete but for vim-style)
+    pub delete_line: KeyBinding,
     pub toggle_complete: KeyBinding,
     pub yank: KeyBinding,
     pub paste: KeyBinding,
-    pub paste_above: KeyBinding,     // 'P' - paste above current task
-    
+    pub paste_above: KeyBinding,
     // Undo/Redo
     pub undo: KeyBinding,
     pub redo: KeyBinding,
-    
-    // Month/Year navigation (vim-style)
+    // Month/Year navigation
     pub next_month: KeyBinding,
     pub prev_month: KeyBinding,
     pub next_year: KeyBinding,
     pub prev_year: KeyBinding,
-    
-    // Week navigation (vim-style)
+    // Week navigation
     pub next_week: KeyBinding,
     pub prev_week: KeyBinding,
-    
-    // Day navigation (vim-style)
+    // Day navigation
     pub first_day_of_month: KeyBinding,
     pub last_day_of_month: KeyBinding,
-    
     // Go to today
     pub go_to_today: KeyBinding,
-    
     // Task editing
     pub save_task: KeyBinding,
     pub cancel_edit: KeyBinding,
     pub switch_field: KeyBinding,
     pub backspace: KeyBinding,
-    
     // App control
     pub quit: KeyBinding,
     pub quit_alt: KeyBinding,
     pub force_quit: KeyBinding,
+    // New config fields
+    pub show_keybinds: bool,
+    pub ui_colors: UiColors,
+}
+
+impl Config {
+    pub fn from_file_or_default<P: AsRef<Path>>(path: P) -> Self {
+        let file = ConfigFile::load_from_yaml(&path);
+        Self::from_config_file(file)
+    }
+    pub fn from_config_file(file: Option<ConfigFile>) -> Self {
+        let show_keybinds = file.as_ref().and_then(|f| f.show_keybinds).unwrap_or(true);
+        let ui_colors = UiColors {
+            selected_task_bg: parse_color("Gray"),
+            selected_task_fg: parse_color("Black"),
+            selected_task_bold: true,
+            selected_completed_task_bg: parse_color("DarkGray"),
+            selected_completed_task_fg: parse_color("Green"),
+            completed_task_fg: parse_color("Green"),
+            default_task_fg: parse_color("White"),
+        };
+        Config {
+            // Navigation (vim-style by default)
+            move_left: KeyBinding { key: KeyCode::Char('h'), modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+            move_down: KeyBinding { key: KeyCode::Char('j'), modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+            move_up: KeyBinding { key: KeyCode::Char('k'), modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+            move_right: KeyBinding { key: KeyCode::Char('l'), modifiers: KeyModifiers::NONE, description: "Move", color: Color::Green },
+            
+            // Task operations
+            insert_edit: KeyBinding { key: KeyCode::Char('i'), modifiers: KeyModifiers::NONE, description: "Insert/Edit", color: Color::Green },
+            insert_above: KeyBinding { key: KeyCode::Char('O'), modifiers: KeyModifiers::SHIFT, description: "Insert Above", color: Color::Green },
+            insert_below: KeyBinding { key: KeyCode::Char('o'), modifiers: KeyModifiers::NONE, description: "Insert Below", color: Color::Green },
+            delete: KeyBinding { key: KeyCode::Char('x'), modifiers: KeyModifiers::NONE, description: "Delete", color: Color::Red },
+            delete_line: KeyBinding { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE, description: "Cut Task (dd)", color: Color::Red },
+            toggle_complete: KeyBinding { key: KeyCode::Char('c'), modifiers: KeyModifiers::NONE, description: "Toggle Complete", color: Color::Blue },
+            
+            // Yank/Paste (vim-style)
+            yank: KeyBinding { key: KeyCode::Char('y'), modifiers: KeyModifiers::NONE, description: "Yank (Copy)", color: Color::Yellow },
+            paste: KeyBinding { key: KeyCode::Char('p'), modifiers: KeyModifiers::NONE, description: "Paste", color: Color::Yellow },
+            paste_above: KeyBinding { key: KeyCode::Char('P'), modifiers: KeyModifiers::SHIFT, description: "Paste Above", color: Color::Yellow },
+            
+            // Undo/Redo
+            undo: KeyBinding { key: KeyCode::Char('u'), modifiers: KeyModifiers::NONE, description: "Undo", color: Color::Magenta },
+            redo: KeyBinding { key: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL, description: "Redo", color: Color::Magenta },
+            
+            // Month/Year navigation (vim-style)
+            next_month: KeyBinding { key: KeyCode::Char('L'), modifiers: KeyModifiers::SHIFT, description: "Next Month", color: Color::Cyan },
+            prev_month: KeyBinding { key: KeyCode::Char('H'), modifiers: KeyModifiers::SHIFT, description: "Prev Month", color: Color::Cyan },
+            next_year: KeyBinding { key: KeyCode::Char('G'), modifiers: KeyModifiers::SHIFT, description: "Last Year", color: Color::Cyan },
+            prev_year: KeyBinding { key: KeyCode::Char('g'), modifiers: KeyModifiers::NONE, description: "First Year (gg)", color: Color::Cyan },
+            
+            // Week navigation (vim-style)
+            next_week: KeyBinding { key: KeyCode::Char('w'), modifiers: KeyModifiers::NONE, description: "Next Week", color: Color::Blue },
+            prev_week: KeyBinding { key: KeyCode::Char('b'), modifiers: KeyModifiers::NONE, description: "Previous Week", color: Color::Blue },
+            
+            // Day navigation (vim-style)
+            first_day_of_month: KeyBinding { key: KeyCode::Char('0'), modifiers: KeyModifiers::NONE, description: "First Day", color: Color::Blue },
+            last_day_of_month: KeyBinding { key: KeyCode::Char('$'), modifiers: KeyModifiers::SHIFT, description: "Last Day", color: Color::Blue },
+            
+            // Go to today
+            go_to_today: KeyBinding { key: KeyCode::Char('t'), modifiers: KeyModifiers::NONE, description: "Go to Today", color: Color::Magenta },
+            
+            // Task editing
+            save_task: KeyBinding { key: KeyCode::Enter, modifiers: KeyModifiers::NONE, description: "Save", color: Color::Green },
+            cancel_edit: KeyBinding { key: KeyCode::Esc, modifiers: KeyModifiers::NONE, description: "Cancel", color: Color::Red },
+            switch_field: KeyBinding { key: KeyCode::Tab, modifiers: KeyModifiers::NONE, description: "Switch Field", color: Color::Green },
+            backspace: KeyBinding { key: KeyCode::Backspace, modifiers: KeyModifiers::NONE, description: "Delete Char", color: Color::Gray },
+            
+            // App control
+            quit: KeyBinding { key: KeyCode::Char('q'), modifiers: KeyModifiers::NONE, description: "Quit", color: Color::Red },
+            quit_alt: KeyBinding { key: KeyCode::Esc, modifiers: KeyModifiers::NONE, description: "Quit", color: Color::Red },
+            force_quit: KeyBinding { key: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL, description: "Force Quit", color: Color::Red },
+            show_keybinds,
+            ui_colors,
+        }
+    }
 }
 
 // ============================================================================
@@ -125,6 +215,16 @@ pub const KEYBINDINGS: Config = Config {
     quit: KeyBinding { key: KeyCode::Char('q'), modifiers: KeyModifiers::NONE, description: "Quit", color: Color::Red },
     quit_alt: KeyBinding { key: KeyCode::Esc, modifiers: KeyModifiers::NONE, description: "Quit", color: Color::Red },
     force_quit: KeyBinding { key: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL, description: "Force Quit", color: Color::Red },
+    show_keybinds: true,
+    ui_colors: UiColors {
+        selected_task_bg: Color::Gray,
+        selected_task_fg: Color::Black,
+        selected_task_bold: true,
+        selected_completed_task_bg: Color::DarkGray,
+        selected_completed_task_fg: Color::Green,
+        completed_task_fg: Color::Green,
+        default_task_fg: Color::White,
+    },
 };
 
 // ============================================================================
@@ -213,5 +313,30 @@ impl Config {
             Span::styled("Esc", Style::default().fg(self.cancel_edit.color)),
             Span::raw(": Cancel"),
         ]
+    }
+}
+
+impl ConfigFile {
+    pub fn load_from_yaml<P: AsRef<Path>>(path: P) -> Option<Self> {
+        let content = fs::read_to_string(path).ok()?;
+        serde_yaml::from_str(&content).ok()
+    }
+}
+
+// NOTE: Add serde_yaml = "*" to your Cargo.toml dependencies
+
+fn parse_color(name: &str) -> Color {
+    match name.to_lowercase().as_str() {
+        "black" => Color::Black,
+        "red" => Color::Red,
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        "blue" => Color::Blue,
+        "magenta" => Color::Magenta,
+        "cyan" => Color::Cyan,
+        "gray" => Color::Gray,
+        "darkgray" => Color::DarkGray,
+        "white" => Color::White,
+        _ => Color::White,
     }
 }

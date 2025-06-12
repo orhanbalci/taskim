@@ -81,6 +81,8 @@ struct App {
     pending_key: Option<char>, // For handling multi-key sequences like 'gg'
     pending_insert_order: Option<u32>, // For tracking task insertion order
     scramble_mode: bool, // Toggle for scrambling task names with numbers
+    config: crate::config::Config, // <-- add config field
+    show_keybinds: bool, // runtime toggle for keybind help
 }
 
 impl App {
@@ -88,7 +90,8 @@ impl App {
         let data = load_data();
         let current_date = Local::now().date_naive();
         let month_view = MonthView::new(current_date);
-        
+        let config = crate::config::Config::from_file_or_default("taskim/config.yml");
+        let show_keybinds = config.show_keybinds;
         Self {
             mode: AppMode::Normal,
             data,
@@ -99,6 +102,8 @@ impl App {
             pending_key: None,
             pending_insert_order: None,
             scramble_mode: false,
+            config,
+            show_keybinds,
         }
     }
     
@@ -168,7 +173,7 @@ impl App {
     
     fn handle_normal_mode_key(&mut self, key: crossterm::event::KeyEvent) -> Result<()> {
         // Handle keybindings
-        if KEYBINDINGS.force_quit.matches(key.code, key.modifiers) {
+        if self.config.force_quit.matches(key.code, key.modifiers) {
             self.should_exit = true;
             return Ok(());
         }
@@ -222,18 +227,18 @@ impl App {
             self.pending_key = None;
         }
         
-        if KEYBINDINGS.quit.matches(key.code, key.modifiers) || 
-           KEYBINDINGS.quit_alt.matches(key.code, key.modifiers) {
+        if self.config.quit.matches(key.code, key.modifiers) || 
+           self.config.quit_alt.matches(key.code, key.modifiers) {
             self.should_exit = true;
-        } else if KEYBINDINGS.move_left.matches(key.code, key.modifiers) {
+        } else if self.config.move_left.matches(key.code, key.modifiers) {
             self.month_view.move_left(&self.data.events);
-        } else if KEYBINDINGS.move_down.matches(key.code, key.modifiers) {
+        } else if self.config.move_down.matches(key.code, key.modifiers) {
             self.month_view.move_down(&self.data.events);
-        } else if KEYBINDINGS.move_up.matches(key.code, key.modifiers) {
+        } else if self.config.move_up.matches(key.code, key.modifiers) {
             self.month_view.move_up(&self.data.events);
-        } else if KEYBINDINGS.move_right.matches(key.code, key.modifiers) {
+        } else if self.config.move_right.matches(key.code, key.modifiers) {
             self.month_view.move_right(&self.data.events);
-        } else if KEYBINDINGS.insert_edit.matches(key.code, key.modifiers) {
+        } else if self.config.insert_edit.matches(key.code, key.modifiers) {
             match &self.month_view.selection.selection_type {
                 SelectionType::Day(date) => {
                     // Create new task
@@ -248,7 +253,7 @@ impl App {
                     }
                 }
             }
-        } else if KEYBINDINGS.insert_below.matches(key.code, key.modifiers) {
+        } else if self.config.insert_below.matches(key.code, key.modifiers) {
             // Insert task below current position (vim-style: o)
             let selected_date = self.month_view.get_selected_date(&self.data.events);
             let edit_state = TaskEditState::new_task(selected_date);
@@ -264,7 +269,7 @@ impl App {
             // For now, set up the task edit state
             self.pending_insert_order = Some(insert_order);
             self.mode = AppMode::TaskEdit(edit_state);
-        } else if KEYBINDINGS.insert_above.matches(key.code, key.modifiers) {
+        } else if self.config.insert_above.matches(key.code, key.modifiers) {
             // Insert task above current position (vim-style: O)
             let selected_date = self.month_view.get_selected_date(&self.data.events);
             let edit_state = TaskEditState::new_task(selected_date);
@@ -279,10 +284,10 @@ impl App {
             // We'll need to track this order for when the task gets created
             self.pending_insert_order = Some(insert_order);
             self.mode = AppMode::TaskEdit(edit_state);
-        } else if KEYBINDINGS.delete_line.matches(key.code, key.modifiers) {
+        } else if self.config.delete_line.matches(key.code, key.modifiers) {
             // Handle first 'd' for 'dd' sequence
             self.pending_key = Some('d');
-        } else if KEYBINDINGS.delete.matches(key.code, key.modifiers) {
+        } else if self.config.delete.matches(key.code, key.modifiers) {
             // Delete/cut the selected task (vim-style 'x') - same as 'dd'
             if let Some(task_id) = self.month_view.get_selected_task_id() {
                 if let Some(deleted_task) = self.data.remove_task_and_reorder(&task_id) {
@@ -317,7 +322,7 @@ impl App {
                     self.save()?;
                 }
             }
-        } else if KEYBINDINGS.undo.matches(key.code, key.modifiers) {
+        } else if self.config.undo.matches(key.code, key.modifiers) {
             // Undo last operation
             if let Some(operation) = self.undo_stack.undo() {
                 match operation {
@@ -365,7 +370,7 @@ impl App {
                 }
                 self.save()?;
             }
-        } else if KEYBINDINGS.redo.matches(key.code, key.modifiers) {
+        } else if self.config.redo.matches(key.code, key.modifiers) {
             // Redo last undone operation
             if let Some(operation) = self.undo_stack.redo() {
                 match operation {
@@ -412,7 +417,7 @@ impl App {
                 }
                 self.save()?;
             }
-        } else if KEYBINDINGS.toggle_complete.matches(key.code, key.modifiers) {
+        } else if self.config.toggle_complete.matches(key.code, key.modifiers) {
             // Toggle task completion
             if let Some(task_id) = self.month_view.get_selected_task_id() {
                 if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
@@ -420,14 +425,14 @@ impl App {
                     self.save()?;
                 }
             }
-        } else if KEYBINDINGS.yank.matches(key.code, key.modifiers) {
+        } else if self.config.yank.matches(key.code, key.modifiers) {
             // Yank (copy) task
             if let Some(task_id) = self.month_view.get_selected_task_id() {
                 if let Some(task) = self.data.events.iter().find(|t| t.id == task_id) {
                     self.yanked_task = Some(task.clone());
                 }
             }
-        } else if KEYBINDINGS.paste.matches(key.code, key.modifiers) {
+        } else if self.config.paste.matches(key.code, key.modifiers) {
             // Paste task below current position
             if let Some(yanked_task) = &self.yanked_task {
                 let selected_date = self.month_view.get_selected_date(&self.data.events);
@@ -464,7 +469,7 @@ impl App {
                 self.month_view.select_task_by_order(selected_date, insert_order, &self.data.events);
                 self.save()?;
             }
-        } else if KEYBINDINGS.paste_above.matches(key.code, key.modifiers) {
+        } else if self.config.paste_above.matches(key.code, key.modifiers) {
             // Paste task above current position
             if let Some(yanked_task) = &self.yanked_task {
                 let selected_date = self.month_view.get_selected_date(&self.data.events);
@@ -501,31 +506,31 @@ impl App {
                 self.month_view.select_task_by_order(selected_date, insert_order, &self.data.events);
                 self.save()?;
             }
-        } else if KEYBINDINGS.next_month.matches(key.code, key.modifiers) {
+        } else if self.config.next_month.matches(key.code, key.modifiers) {
             // Next month (vim-style: L) - preserve day
             self.month_view.next_month_preserve_day();
-        } else if KEYBINDINGS.prev_month.matches(key.code, key.modifiers) {
+        } else if self.config.prev_month.matches(key.code, key.modifiers) {
             // Previous month (vim-style: H) - preserve day
             self.month_view.prev_month_preserve_day();
-        } else if KEYBINDINGS.next_year.matches(key.code, key.modifiers) {
+        } else if self.config.next_year.matches(key.code, key.modifiers) {
             // Next year (vim-style: G)
             self.month_view.next_year();
-        } else if KEYBINDINGS.prev_year.matches(key.code, key.modifiers) {
+        } else if self.config.prev_year.matches(key.code, key.modifiers) {
             // Handle first 'g' for 'gg' sequence
             self.pending_key = Some('g');
-        } else if KEYBINDINGS.go_to_today.matches(key.code, key.modifiers) {
+        } else if self.config.go_to_today.matches(key.code, key.modifiers) {
             // Go to today (vim-style: t)
             self.month_view.go_to_today();
-        } else if KEYBINDINGS.next_week.matches(key.code, key.modifiers) {
+        } else if self.config.next_week.matches(key.code, key.modifiers) {
             // Next week (vim-style: w)
             self.month_view.next_week(&self.data.events);
-        } else if KEYBINDINGS.prev_week.matches(key.code, key.modifiers) {
+        } else if self.config.prev_week.matches(key.code, key.modifiers) {
             // Previous week (vim-style: b)
             self.month_view.prev_week(&self.data.events);
-        } else if KEYBINDINGS.first_day_of_month.matches(key.code, key.modifiers) {
+        } else if self.config.first_day_of_month.matches(key.code, key.modifiers) {
             // First day of month (vim-style: 0)
             self.month_view.first_day_of_month();
-        } else if KEYBINDINGS.last_day_of_month.matches(key.code, key.modifiers) ||
+        } else if self.config.last_day_of_month.matches(key.code, key.modifiers) ||
                   (key.code == KeyCode::Char('$') && key.modifiers == KeyModifiers::NONE) {
             // Last day of month (vim-style: $) - handle both shift+4 and direct $
             self.month_view.last_day_of_month();
@@ -609,6 +614,13 @@ impl App {
     
     fn execute_command(&mut self, command: &str) -> Result<()> {
         let trimmed = command.trim();
+        if trimmed == ":set seekeys" || trimmed == "set seekeys" || trimmed == "seekeys" {
+            self.show_keybinds = true;
+            return Ok(());
+        } else if trimmed == ":set nokeys" || trimmed == "set nokeys" || trimmed == "nokeys" {
+            self.show_keybinds = false;
+            return Ok(());
+        }
         
         if trimmed.is_empty() {
             return Ok(());
@@ -752,7 +764,7 @@ impl App {
         ]).split(area);
         
         // Render main content
-        render_month_view(frame, layout[0], &self.month_view, &self.data.events, self.scramble_mode);
+        render_month_view(frame, layout[0], &self.month_view, &self.data.events, self.scramble_mode, &self.config);
         
         // Render footer
         self.render_footer(frame, layout[1]);
@@ -832,17 +844,23 @@ impl App {
                 }
             }
             AppMode::Normal => {
-                let spans = KEYBINDINGS.get_normal_mode_help_spans(
-                    self.undo_stack.can_undo(),
-                    self.undo_stack.can_redo()
-                );
-                let help_text = vec![Line::from(spans)];
-                let footer = Paragraph::new(help_text)
-                    .style(Style::default().fg(Color::Gray));
-                frame.render_widget(footer, area);
+                if self.show_keybinds {
+                    let spans = self.config.get_normal_mode_help_spans(
+                        self.undo_stack.can_undo(),
+                        self.undo_stack.can_redo()
+                    );
+                    let help_text = vec![Line::from(spans)];
+                    let footer = Paragraph::new(help_text)
+                        .style(Style::default().fg(Color::Gray));
+                    frame.render_widget(footer, area);
+                } else {
+                    // Show minimal footer
+                    let footer = Paragraph::new("").style(Style::default().fg(Color::Gray));
+                    frame.render_widget(footer, area);
+                }
             }
             AppMode::TaskEdit(_) => {
-                let spans = KEYBINDINGS.get_edit_mode_help_spans();
+                let spans = self.config.get_edit_mode_help_spans();
                 let help_text = vec![Line::from(spans)];
                 let footer = Paragraph::new(help_text)
                     .style(Style::default().fg(Color::Gray));

@@ -1,0 +1,52 @@
+# Taskim Configuration File
+# Edit this file to customize your Taskim experience
+
+# UI settings
+show_keybinds: false # Whether to show keybinds in the UI by default
+wrap_text: false     # Whether to wrap text by default
+
+# UI Colors (use ratatui color names)
+colors:
+  selected_task_bg: "Gray"
+  selected_task_fg: "Black"
+  selected_task_bold: true
+  selected_completed_task_bg: "DarkGray"
+  selected_completed_task_fg: "Green"
+  completed_task_fg: "Green"
+  default_task_fg: "White"
+  default_bg: "Black"
+  default_fg: "White"
+
+# Keybindings (use string format, e.g. 'h', 'j', 'k', 'l', 'Ctrl+r', 'Esc')
+keybindings:
+  move_left: "h"
+  move_down: "j"
+  move_up: "k"
+  move_right: "l"
+  insert_edit: "i"
+  insert_above: "O"
+  insert_below: "o"
+  delete: "x"
+  delete_line: "d"
+  toggle_complete: "c"
+  yank: "y"
+  paste: "p"
+  paste_above: "P"
+  undo: "u"
+  redo: "Ctrl+r"
+  next_month: "L"
+  prev_month: "H"
+  next_year: "G"
+  prev_year: "g"
+  next_week: "w"
+  prev_week: "b"
+  first_day_of_month: "0"
+  last_day_of_month: "$"
+  go_to_today: "t"
+  save_task: "Enter"
+  cancel_edit: "Esc"
+  switch_field: "Tab"
+  backspace: "Backspace"
+  quit: "q"
+  quit_alt: "Esc"
+  force_quit: "Ctrl+c"

@@ -514,6 +514,7 @@ pub fn render_month_view(
     month_view: &MonthView,
     tasks: &[Task],
     scramble_mode: bool,
+    config: &crate::config::Config,
 ) {
     let title = format!(
         "{} {}",
@@ -612,7 +613,7 @@ pub fn render_month_view(
             }
 
             let day_area = day_layout[day_index];
-            render_day_cell(frame, day_area, date, month_view, tasks, scramble_mode);
+            render_day_cell(frame, day_area, date, month_view, tasks, scramble_mode, config);
         }
     }
 }
@@ -624,6 +625,7 @@ fn render_day_cell(
     month_view: &MonthView,
     tasks: &[Task],
     scramble_mode: bool,
+    config: &crate::config::Config,
 ) {
     let is_current_month = date.month() == month_view.current_date.month();
     let is_selected_day = matches!(month_view.selection.selection_type, SelectionType::Day(selected_date) if selected_date == date);
@@ -685,11 +687,9 @@ fn render_day_cell(
             let task_area = day_layout[1];
 
             if month_view.wrap_enabled {
-                // Wrap mode: render tasks as individual paragraphs
-                render_tasks_wrapped(frame, task_area, &day_tasks, month_view, scramble_mode);
+                render_tasks_wrapped(frame, task_area, &day_tasks, month_view, scramble_mode, config);
             } else {
-                // Nowrap mode: render tasks as list with truncation
-                render_tasks_nowrap(frame, task_area, &day_tasks, month_view, scramble_mode);
+                render_tasks_nowrap(frame, task_area, &day_tasks, month_view, scramble_mode, config);
             }
         }
     }
@@ -701,6 +701,7 @@ fn render_tasks_nowrap(
     day_tasks: &[&Task],
     month_view: &MonthView,
     scramble_mode: bool,
+    config: &crate::config::Config,
 ) {
     let task_items: Vec<ListItem> = day_tasks
         .iter()
@@ -712,16 +713,21 @@ fn render_tasks_nowrap(
             );
 
             let style = if is_selected_task && task.completed {
-                Style::default().bg(Color::DarkGray).fg(Color::Green)
-            } else if is_selected_task {
                 Style::default()
-                    .bg(Color::Gray)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD)
+                    .bg(config.ui_colors.selected_completed_task_bg)
+                    .fg(config.ui_colors.selected_completed_task_fg)
+            } else if is_selected_task {
+                let mut s = Style::default()
+                    .bg(config.ui_colors.selected_task_bg)
+                    .fg(config.ui_colors.selected_task_fg);
+                if config.ui_colors.selected_task_bold {
+                    s = s.add_modifier(Modifier::BOLD);
+                }
+                s
             } else if task.completed && !is_selected_task {
-                Style::default().fg(Color::Green)
+                Style::default().fg(config.ui_colors.completed_task_fg)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(config.ui_colors.default_task_fg)
             };
 
             let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
@@ -757,6 +763,7 @@ fn render_tasks_wrapped(
     day_tasks: &[&Task],
     month_view: &MonthView,
     scramble_mode: bool,
+    config: &crate::config::Config,
 ) {
     if day_tasks.is_empty() {
         return;
@@ -817,16 +824,21 @@ fn render_tasks_wrapped(
         );
 
         let style = if is_selected_task && task.completed {
-            Style::default().bg(Color::DarkGray).fg(Color::Green)
-        } else if is_selected_task {
             Style::default()
-                .bg(Color::Gray)
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD)
+                .bg(config.ui_colors.selected_completed_task_bg)
+                .fg(config.ui_colors.selected_completed_task_fg)
+        } else if is_selected_task {
+            let mut s = Style::default()
+                .bg(config.ui_colors.selected_task_bg)
+                .fg(config.ui_colors.selected_task_fg);
+            if config.ui_colors.selected_task_bold {
+                s = s.add_modifier(Modifier::BOLD);
+            }
+            s
         } else if task.completed && !is_selected_task {
-            Style::default().fg(Color::Green)
+            Style::default().fg(config.ui_colors.completed_task_fg)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(config.ui_colors.default_task_fg)
         };
 
         let paragraph = Paragraph::new(
