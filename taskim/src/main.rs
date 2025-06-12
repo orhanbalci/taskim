@@ -936,12 +936,12 @@ impl App {
                         ]),
                     ];
                     let help_paragraph = Paragraph::new(help_lines)
-                        .style(Style::default().fg(self.config.ui_colors.default_fg));
+                        .style(Style::default().fg(self.config.ui_colors.default_fg).bg(self.config.ui_colors.default_bg));
                     frame.render_widget(help_paragraph, area);
                 } else {
                     let command_line = format!(":{}", state.input);
                     let command_paragraph = Paragraph::new(command_line.as_str())
-                        .style(Style::default().fg(self.config.ui_colors.default_fg));
+                        .style(Style::default().fg(self.config.ui_colors.default_fg).bg(self.config.ui_colors.default_bg));
                     frame.render_widget(command_paragraph, area);
                     frame.set_cursor_position(Position::new(
                         area.x + 1 + state.cursor_position as u16,

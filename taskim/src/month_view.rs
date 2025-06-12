@@ -525,7 +525,7 @@ pub fn render_month_view(
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .style(Style::default().fg(config.ui_colors.selected_task_bg).bg(config.ui_colors.default_fg));
+        .style(Style::default().fg(config.ui_colors.selected_task_bg).bg(config.ui_colors.default_bg));
 
     let inner_area = block.inner(area);
     frame.render_widget(block, area);

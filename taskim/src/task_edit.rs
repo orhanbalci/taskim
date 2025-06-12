@@ -114,7 +114,6 @@ pub fn render_task_edit_popup(
         .borders(Borders::ALL)
         .style(Style::default().fg(colors.popup_fg).bg(colors.popup_bg))
         .border_style(Style::default().fg(colors.border_fg));
-    
     let inner_area = block.inner(popup_area);
     frame.render_widget(block, popup_area);
     
@@ -126,35 +125,42 @@ pub fn render_task_edit_popup(
     ]).split(inner_area);
     
     // Render title field
-    let title_style = if state.editing_field == EditingField::Title {
+    let title_selected = state.editing_field == EditingField::Title;
+    let title_style = if title_selected {
         Style::default().fg(colors.title_selected_fg).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(colors.title_fg)
     };
-
+    let title_border_style = if title_selected {
+        Style::default().fg(colors.border_selected_fg)
+    } else {
+        Style::default().fg(colors.border_fg)
+    };
     let title_block = Block::default()
         .title("Title")
         .borders(Borders::ALL)
-        .border_style(title_style);
-
+        .border_style(title_border_style);
     let title_paragraph = Paragraph::new(state.title.as_str())
         .block(title_block)
         .style(title_style);
-
     frame.render_widget(title_paragraph, layout[0]);
 
     // Render content field
-    let content_style = if state.editing_field == EditingField::Content {
+    let content_selected = state.editing_field == EditingField::Content;
+    let content_style = if content_selected {
         Style::default().fg(colors.content_selected_fg).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(colors.content_fg)
     };
-
+    let content_border_style = if content_selected {
+        Style::default().fg(colors.border_selected_fg)
+    } else {
+        Style::default().fg(colors.border_fg)
+    };
     let content_block = Block::default()
         .title("Content")
         .borders(Borders::ALL)
-        .border_style(content_style);
-
+        .border_style(content_border_style);
     let content_paragraph = Paragraph::new(state.content.as_str())
         .block(content_block)
         .style(content_style)
