@@ -729,6 +729,10 @@ fn parse_color(map: &Option<HashMap<String, String>>, key: &str, default: Color)
 }
 
 fn parse_color_name(name: &str) -> Color {
+    // Try to parse as integer for indexed color
+    if let Ok(idx) = name.parse::<u8>() {
+        return Color::Indexed(idx);
+    }
     match name.to_lowercase().as_str() {
         "black" => Color::Black,
         "red" => Color::Red,

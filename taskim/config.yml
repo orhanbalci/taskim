@@ -5,7 +5,7 @@
 show_keybinds: false # Whether to show keybinds in the UI by default
 wrap_text: false     # Whether to wrap text by default
 
-# UI Colors (use ratatui color names)
+# UI Colors (use ratatui color names or indexed colors (16-231))
 colors:
   selected_task_bg: "Gray"
   selected_task_fg: "Black"
