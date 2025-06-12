@@ -14,6 +14,7 @@ colors:
   selected_completed_task_fg: "Green"
   completed_task_fg: "Green"
   default_task_fg: "White"
+  day_number_fg: "White"
   default_bg: "Black"
   default_fg: "White"
 

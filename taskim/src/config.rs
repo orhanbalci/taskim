@@ -36,6 +36,8 @@ impl KeyBinding {
 pub struct UiColors {
     pub default_fg: Color,
     pub default_bg: Color,
+    pub default_task_fg: Color,
+    pub day_number_fg: Color,
     pub selected_task_fg: Color,
     pub selected_task_bg: Color,
     pub completed_task_fg: Color,
@@ -122,6 +124,8 @@ impl Config {
         let ui_colors = UiColors {
             default_fg: parse_color(&colors, "default_fg", Color::White),
             default_bg: parse_color(&colors, "default_bg", Color::Black),
+            default_task_fg: parse_color(&colors, "default_task_fg", Color::White),
+            day_number_fg: parse_color(&colors, "day_number_fg", Color::White),
             selected_task_fg: parse_color(&colors, "selected_task_fg", Color::Black),
             selected_task_bg: parse_color(&colors, "selected_task_bg", Color::Gray),
             completed_task_fg: parse_color(&colors, "completed_task_fg", Color::Green),
@@ -588,6 +592,8 @@ pub const KEYBINDINGS: Config = Config {
     ui_colors: UiColors {
         default_fg: Color::White,
         default_bg: Color::Black,
+        default_task_fg: Color::White,
+        day_number_fg: Color::White,
         selected_task_fg: Color::Black,
         selected_task_bg: Color::Gray,
         completed_task_fg: Color::Green,

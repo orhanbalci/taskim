@@ -3,7 +3,7 @@ use crate::utils::days_in_month;
 use chrono::{Datelike, NaiveDate};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color,Modifier, Style},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
@@ -640,7 +640,7 @@ fn render_day_cell(
     } else if !is_current_month {
         Style::default().fg(config.ui_colors.selected_completed_task_bg)
     } else {
-        Style::default().fg(config.ui_colors.default_fg)
+        Style::default().fg(config.ui_colors.day_number_fg)
     };
 
     let border_style = if is_selected_day {
@@ -727,7 +727,7 @@ fn render_tasks_nowrap(
             } else if task.completed && !is_selected_task {
                 Style::default().fg(config.ui_colors.completed_task_fg)
             } else {
-                Style::default().fg(config.ui_colors.default_fg)
+                Style::default().fg(config.ui_colors.default_task_fg)
             };
 
             let max_width = area.width.saturating_sub(2) as usize; // Account for list padding
@@ -752,7 +752,7 @@ fn render_tasks_nowrap(
         })
         .collect();
 
-    let task_list = List::new(task_items).style(Style::default().fg(config.ui_colors.default_fg));
+    let task_list = List::new(task_items).style(Style::default());
 
     frame.render_widget(task_list, area);
 }
@@ -838,7 +838,7 @@ fn render_tasks_wrapped(
         } else if task.completed && !is_selected_task {
             Style::default().fg(config.ui_colors.completed_task_fg)
         } else {
-            Style::default().fg(config.ui_colors.default_fg)
+            Style::default()
         };
 
         let paragraph = Paragraph::new(
