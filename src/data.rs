@@ -31,10 +31,3 @@ pub fn save_data(data: &TaskData) -> Result<(), color_eyre::eyre::Error> {
     fs::write(DATA_FILE, content)?;
     Ok(())
 }
-
-#[allow(dead_code)]
-pub fn import_from_js_export(file_path: &str) -> Result<TaskData, color_eyre::eyre::Error> {
-    let content = fs::read_to_string(file_path)?;
-    let data: TaskData = serde_json::from_str(&content)?;
-    Ok(data)
-}

@@ -210,7 +210,6 @@ impl App {
                         // Track deletion for undo functionality
                         self.undo_stack.push(Operation::DeleteTask {
                             task,
-                            original_date: task_date,
                         });
 
                         // Check if there are any remaining tasks on the same date
@@ -220,7 +219,6 @@ impl App {
                             // No more tasks on this day, select the day itself
                             self.month_view.selection = month_view::Selection {
                                 selection_type: month_view::SelectionType::Day(task_date),
-                                task_index_in_day: None,
                             };
                         } else {
                             // Select the first remaining task
@@ -228,7 +226,6 @@ impl App {
                                 selection_type: month_view::SelectionType::Task(
                                     remaining_tasks[0].id.clone(),
                                 ),
-                                task_index_in_day: Some(0),
                             };
                         }
 
@@ -330,7 +327,6 @@ impl App {
                     // Track deletion for undo functionality
                     self.undo_stack.push(Operation::DeleteTask {
                         task: deleted_task,
-                        original_date: task_date,
                     });
 
                     // Check if there are any remaining tasks on the same date
@@ -340,7 +336,6 @@ impl App {
                         // No more tasks on this day, select the day itself
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Day(task_date),
-                            task_index_in_day: None,
                         };
                     } else {
                         // Select the first remaining task (ordered)
@@ -348,7 +343,6 @@ impl App {
                             selection_type: month_view::SelectionType::Task(
                                 remaining_tasks[0].id.clone(),
                             ),
-                            task_index_in_day: Some(0),
                         };
                     }
 
@@ -361,7 +355,6 @@ impl App {
                 match operation {
                     Operation::DeleteTask {
                         task,
-                        original_date: _,
                     } => {
                         // Restore deleted task
                         self.data.events.push(task.clone());
@@ -369,7 +362,6 @@ impl App {
                         // Select the restored task
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Task(task.id),
-                            task_index_in_day: Some(0),
                         };
                     }
                     Operation::EditTask {
@@ -392,29 +384,7 @@ impl App {
                         let task_date = task.start.date_naive();
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Day(task_date),
-                            task_index_in_day: None,
                         };
-                    }
-                    Operation::YankPaste {
-                        task_id,
-                        old_date,
-                        new_date: _,
-                    } => {
-                        // TODO: Implement when yank/paste is added
-                        // For now, we'll revert the task to its old date
-                        if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
-                            let duration = task.end - task.start;
-                            let old_datetime = old_date
-                                .and_hms_opt(
-                                    task.start.time().hour(),
-                                    task.start.time().minute(),
-                                    task.start.time().second(),
-                                )
-                                .unwrap()
-                                .and_utc();
-                            task.start = old_datetime;
-                            task.end = old_datetime + duration;
-                        }
                     }
                 }
                 self.save()?;
@@ -425,7 +395,6 @@ impl App {
                 match operation {
                     Operation::DeleteTask {
                         task,
-                        original_date: _,
                     } => {
                         // Re-delete the task
                         self.data.events.retain(|t| t.id != task.id);
@@ -434,7 +403,6 @@ impl App {
                         let task_date = task.start.date_naive();
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Day(task_date),
-                            task_index_in_day: None,
                         };
                     }
                     Operation::EditTask {
@@ -456,28 +424,8 @@ impl App {
                         // Select the restored task
                         self.month_view.selection = month_view::Selection {
                             selection_type: month_view::SelectionType::Task(task.id),
-                            task_index_in_day: Some(0),
+                            // task_index_in_day: Some(0),
                         };
-                    }
-                    Operation::YankPaste {
-                        task_id,
-                        old_date: _,
-                        new_date,
-                    } => {
-                        // TODO: Implement when yank/paste is added
-                        if let Some(task) = self.data.events.iter_mut().find(|t| t.id == task_id) {
-                            let duration = task.end - task.start;
-                            let new_datetime = new_date
-                                .and_hms_opt(
-                                    task.start.time().hour(),
-                                    task.start.time().minute(),
-                                    task.start.time().second(),
-                                )
-                                .unwrap()
-                                .and_utc();
-                            task.start = new_datetime;
-                            task.end = new_datetime + duration;
-                        }
                     }
                 }
                 self.save()?;
@@ -786,7 +734,6 @@ impl App {
 
             self.month_view.selection = month_view::Selection {
                 selection_type: month_view::SelectionType::Day(date),
-                task_index_in_day: None,
             };
 
             return Ok(());

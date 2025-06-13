@@ -17,8 +17,6 @@ pub enum SelectionType {
 #[derive(Debug, Clone)]
 pub struct Selection {
     pub selection_type: SelectionType,
-    #[allow(dead_code)]
-    pub task_index_in_day: Option<usize>,
 }
 
 pub struct MonthView {
@@ -45,7 +43,6 @@ impl MonthView {
     fn create_day_selection(date: NaiveDate) -> Selection {
         Selection {
             selection_type: SelectionType::Day(date),
-            task_index_in_day: None,
         }
     }
 
@@ -55,10 +52,9 @@ impl MonthView {
     }
 
     // Helper method to create a task selection
-    fn create_task_selection(task_id: String, index: Option<usize>) -> Selection {
+    fn create_task_selection(task_id: String) -> Selection {
         Selection {
             selection_type: SelectionType::Task(task_id),
-            task_index_in_day: index,
         }
     }
 
@@ -68,8 +64,8 @@ impl MonthView {
     }
 
     // Helper method to select a task
-    fn select_task(&mut self, task_id: String, index: Option<usize>) {
-        self.selection = Self::create_task_selection(task_id, index);
+    fn select_task(&mut self, task_id: String) {
+        self.selection = Self::create_task_selection(task_id);
     }
 
     // Helper method to transition to a new month and update everything
@@ -183,7 +179,7 @@ impl MonthView {
                             if !day_tasks.is_empty() {
                                 let mut sorted_tasks = day_tasks;
                                 sorted_tasks.sort_by_key(|t| t.order);
-                                self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                                self.select_task(sorted_tasks[0].id.clone());
                             }
                         }
                     } else {
@@ -195,7 +191,7 @@ impl MonthView {
                         if !day_tasks.is_empty() {
                             let mut sorted_tasks = day_tasks;
                             sorted_tasks.sort_by_key(|t| t.order);
-                            self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                            self.select_task(sorted_tasks[0].id.clone());
                         }
                     }
                 }
@@ -213,7 +209,7 @@ impl MonthView {
                         if current_index > 0 {
                             // Move to previous task
                             let prev_task = &day_tasks[current_index - 1];
-                            self.select_task(prev_task.id.clone(), Some(current_index - 1));
+                            self.select_task(prev_task.id.clone());
                         } else {
                             // Move to day selection
                             self.select_day(task_date);
@@ -237,7 +233,7 @@ impl MonthView {
 
                 if !day_tasks.is_empty() {
                     // Move to first task (ordered)
-                    self.select_task(day_tasks[0].id.clone(), Some(0));
+                    self.select_task(day_tasks[0].id.clone());
                 } else {
                     // Move down one week
                     if let Some(new_date) =
@@ -251,7 +247,7 @@ impl MonthView {
                         if !new_day_tasks.is_empty() {
                             let mut sorted_tasks = new_day_tasks;
                             sorted_tasks.sort_by_key(|t| t.order);
-                            self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                            self.select_task(sorted_tasks[0].id.clone());
                         }
                     }
                 }
@@ -269,7 +265,7 @@ impl MonthView {
                         if current_index < day_tasks.len() - 1 {
                             // Move to next task
                             let next_task = &day_tasks[current_index + 1];
-                            self.select_task(next_task.id.clone(), Some(current_index + 1));
+                            self.select_task(next_task.id.clone());
                         } else {
                             // Move to next week same day
                             if let Some(new_date) =
@@ -283,7 +279,7 @@ impl MonthView {
                                 if !new_day_tasks.is_empty() {
                                     let mut sorted_tasks = new_day_tasks;
                                     sorted_tasks.sort_by_key(|t| t.order);
-                                    self.select_task(sorted_tasks[0].id.clone(), Some(0));
+                                    self.select_task(sorted_tasks[0].id.clone());
                                 }
                             }
                         }
@@ -458,8 +454,7 @@ impl MonthView {
         day_tasks.sort_by_key(|t| t.order);
 
         if let Some(task) = day_tasks.iter().find(|t| t.order == order) {
-            let index = day_tasks.iter().position(|t| t.id == task.id);
-            self.select_task(task.id.clone(), index);
+            self.select_task(task.id.clone());
         }
     }
 }
