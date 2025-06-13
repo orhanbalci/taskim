@@ -5,6 +5,7 @@ mod task;
 mod task_edit;
 mod undo;
 mod utils;
+mod commands;
 
 use crate::data::{load_data, save_data};
 use crate::month_view::{render_month_view, MonthView, SelectionType};
@@ -12,18 +13,18 @@ use crate::task::TaskData;
 use crate::task_edit::{render_task_edit_popup, TaskEditState};
 use crate::undo::{Operation, UndoStack};
 use crate::utils::days_in_month;
+use commands::get_command_registry;
 
 use chrono::{Datelike, Local, Timelike};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Layout, Position, Rect},
+    layout::{Constraint, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::Paragraph,
     DefaultTerminal, Frame,
 };
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 enum AppMode {
@@ -37,6 +38,7 @@ struct CommandState {
     input: String,
     cursor_position: usize,
     show_help: bool,
+    last_error: Option<String>,
 }
 
 impl CommandState {
@@ -45,6 +47,7 @@ impl CommandState {
             input: String::new(),
             cursor_position: 0,
             show_help: false,
+            last_error: None,
         }
     }
 
@@ -69,117 +72,6 @@ impl CommandState {
             self.cursor_position += 1;
         }
     }
-}
-
-struct CommandInfo {
-    description: &'static str,
-}
-
-fn get_command_registry() -> HashMap<&'static str, CommandInfo> {
-    let mut map = HashMap::new();
-    map.insert(
-        "q",
-        CommandInfo {
-            description: "Quit the application.",
-        },
-    );
-    map.insert(
-        "quit",
-        CommandInfo {
-            description: "Quit the application.",
-        },
-    );
-    map.insert(
-        "wq",
-        CommandInfo {
-            description: "Quit the application.",
-        },
-    );
-    map.insert(
-        "x",
-        CommandInfo {
-            description: "Quit the application.",
-        },
-    );
-    map.insert(
-        "help",
-        CommandInfo {
-            description: "Show help for all commands or a specific command.",
-        },
-    );
-    map.insert(
-        "seekeys",
-        CommandInfo {
-            description: "Show keybindings bar.",
-        },
-    );
-    map.insert(
-        "set seekeys",
-        CommandInfo {
-            description: "Show keybindings bar.",
-        },
-    );
-    map.insert(
-        "nokeys",
-        CommandInfo {
-            description: "Hide keybindings bar.",
-        },
-    );
-    map.insert(
-        "set nokeys",
-        CommandInfo {
-            description: "Hide keybindings bar.",
-        },
-    );
-    map.insert(
-        "wrap",
-        CommandInfo {
-            description: "Enable UI text wrapping.",
-        },
-    );
-    map.insert(
-        "set wrap",
-        CommandInfo {
-            description: "Enable UI text wrapping.",
-        },
-    );
-    map.insert(
-        "nowrap",
-        CommandInfo {
-            description: "Disable UI text wrapping.",
-        },
-    );
-    map.insert(
-        "set nowrap",
-        CommandInfo {
-            description: "Disable UI text wrapping.",
-        },
-    );
-    map.insert(
-        "YYYY",
-        CommandInfo {
-            description: "Jump to a specific year (e.g., :2025).",
-        },
-    );
-    map.insert(
-        "MM/DD/YYYY",
-        CommandInfo {
-            description: "Jump to a specific date (e.g., :06/15/2025).",
-        },
-    );
-    map.insert(
-        "YYYY-MM-DD",
-        CommandInfo {
-            description: "Jump to a specific date (e.g., :2025-06-15).",
-        },
-    );
-    map.insert(
-        "DD",
-        CommandInfo {
-            description: "Jump to a specific day in the current month (e.g., :15).",
-        },
-    );
-    map
 }
 
 struct App {
@@ -740,12 +632,17 @@ impl App {
                     state.cursor_position = 0;
                     return Ok(false); // Stay in command mode to show help
                 } else if !command.is_empty() {
-                    if let Err(e) = self.execute_command(&state.input) {
-                        // For now, just return to normal mode on any error
-                        // TODO: Add error display
-                        eprintln!("Command error: {}", e);
+                    match self.execute_command(&state.input) {
+                        Ok(_) => {
+                            state.last_error = None;
+                        }
+                        Err(e) => {
+                            state.last_error = Some(e);
+                        }
                     }
-                    return Ok(true);
+                    state.input.clear();
+                    state.cursor_position = 0;
+                    return Ok(state.last_error.is_none());
                 } else {
                     // Empty command, just exit
                     return Ok(true);
@@ -772,56 +669,34 @@ impl App {
         Ok(false)
     }
 
-    fn execute_command(&mut self, command: &str) -> Result<()> {
+    fn execute_command(&mut self, command: &str) -> Result<(), String> {
         let trimmed = command.trim();
         let registry = get_command_registry();
         // Special handling for help command
         if trimmed.starts_with("help") {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() == 1 {
-                // Show all commands
                 let mut help_text = String::from("Available commands:\n");
                 for (cmd, info) in &registry {
                     help_text.push_str(&format!(":{:<15} - {}\n", cmd, info.description));
                 }
-                println!("{}", help_text); // For now, print to stdout; you may want to show in UI
-                return Ok(());
+                return Err(help_text);
             } else if parts.len() == 2 {
-                let query = parts[1];
+                let query = parts[1].trim_start_matches(':');
                 if let Some(info) = registry.get(query) {
-                    println!(":{} - {}", query, info.description);
+                    return Err(format!(":{} - {}", query, info.description));
                 } else {
-                    println!("No help found for :{}", query);
+                    return Err(format!("No help found for :{}", query));
                 }
-                return Ok(());
             }
         }
         if trimmed.is_empty() {
             return Ok(());
         }
-        // Match against known commands
-        match trimmed {
-            "q" | "quit" | "wq" | "x" => {
-                self.should_exit = true;
-                return Ok(());
-            }
-            "seekeys" | ":set seekeys" | "set seekeys" => {
-                self.show_keybinds = true;
-                return Ok(());
-            }
-            "nokeys" | ":set nokeys" | "set nokeys" => {
-                self.show_keybinds = false;
-                return Ok(());
-            }
-            "wrap" | "set wrap" => {
-                self.month_view.set_wrap(true);
-                return Ok(());
-            }
-            "nowrap" | "set nowrap" => {
-                self.month_view.set_wrap(false);
-                return Ok(());
-            }
-            _ => {}
+        // Try registry
+        if let Some(cmd) = registry.get(trimmed) {
+            (cmd.exec)(self, trimmed)?;
+            return Ok(());
         }
         // Try to parse as a date in various formats
         if let Some(date) = self.parse_date_command(trimmed) {
@@ -837,10 +712,7 @@ impl App {
             };
             return Ok(());
         }
-        Err(color_eyre::eyre::eyre!(
-            "Unknown command: {}. Type ':help' for available commands.",
-            trimmed
-        ))
+        Err(format!("Unknown command: {}. Type ':help' for available commands.", trimmed))
     }
 
     fn parse_date_command(&self, input: &str) -> Option<chrono::NaiveDate> {
@@ -950,6 +822,14 @@ impl App {
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
         match &self.mode {
             AppMode::Command(state) => {
+                let mut lines = vec![];
+                let has_error_or_help = state.last_error.is_some() || state.show_help;
+                if let Some(err) = &state.last_error {
+                    lines.push(Line::from(vec![Span::styled(
+                        err,
+                        Style::default().fg(self.config.ui_colors.selected_completed_task_bg),
+                    )]));
+                }
                 if state.show_help {
                     let help_lines = vec![
                         Line::from(vec![Span::styled(
@@ -1019,25 +899,18 @@ impl App {
                             Span::raw(" - Exit command mode"),
                         ]),
                     ];
-                    let help_paragraph = Paragraph::new(help_lines).style(
-                        Style::default()
-                            .fg(self.config.ui_colors.default_fg)
-                            .bg(self.config.ui_colors.default_bg),
-                    );
-                    frame.render_widget(help_paragraph, area);
-                } else {
-                    let command_line = format!(":{}", state.input);
-                    let command_paragraph = Paragraph::new(command_line.as_str()).style(
-                        Style::default()
-                            .fg(self.config.ui_colors.default_fg)
-                            .bg(self.config.ui_colors.default_bg),
-                    );
-                    frame.render_widget(command_paragraph, area);
-                    frame.set_cursor_position(Position::new(
-                        area.x + 1 + state.cursor_position as u16,
-                        area.y,
-                    ));
+                    lines.extend(help_lines)
                 }
+                if !has_error_or_help {
+                    let command_line = format!(":{}", state.input);
+                    lines.push(Line::from(vec![Span::raw(command_line)]));
+                }
+                let help_paragraph = Paragraph::new(lines).style(
+                    Style::default()
+                        .fg(self.config.ui_colors.default_fg)
+                        .bg(self.config.ui_colors.default_bg),
+                );
+                frame.render_widget(help_paragraph, area);
             }
             AppMode::Normal => {
                 if self.show_keybinds {
