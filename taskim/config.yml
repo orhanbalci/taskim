@@ -22,14 +22,14 @@ colors:
 task_edit_colors:
   popup_bg: "Black"
   popup_fg: "White"
-  border_fg: "White"
-  border_selected_fg: "Blue"
+  border_fg: "DarkGray"
+  border_selected_fg: "Gray"
   title_fg: "White"
-  title_selected_fg: "Blue"
+  title_selected_fg: "White"
   content_fg: "White"
-  content_selected_fg: "Blue"
+  content_selected_fg: "White"
   instructions_fg: "Gray"
-  instructions_key_fg: "Blue"
+  instructions_key_fg: "White"
 
 # Keybindings (use string format, e.g. 'h', 'j', 'k', 'l', 'Ctrl+r', 'Esc')
 keybindings:
