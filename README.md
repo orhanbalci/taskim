@@ -1,0 +1,44 @@
+# Taskim
+
+Taskim is a terminal-based task manager built with Rust and [ratatui](https://github.com/ratatui-org/ratatui). It provides a Vim-inspired interface for managing tasks, navigating months, and customizing your workflow.
+
+## Features
+
+- **Monthly Calendar View:**  
+  Visualize your tasks in a month grid, with navigation for days, weeks, months, and years.
+- **Task Management:**  
+  - Add, edit, and delete tasks for any date.
+  - Tasks can have titles and optional content/comments.
+  - Mark tasks as complete/incomplete.
+  - Reorder tasks within a day.
+- **Vim-style Keybindings:**  
+  - Navigate with `h`, `j`, `k`, `l` or arrow keys.
+  - Insert tasks above/below (`O`/`o`), delete (`dd`/`x`), yank/copy (`y`), paste (`p`/`P`), undo/redo, and more.
+  - Command mode (`:`) for advanced actions (e.g., go to date, toggle wrap, show/hide keybinds).
+- **Undo/Redo:**  
+  Supports undoing and redoing task operations.
+- **Scramble Mode:**  
+  Toggle (`s`) to obscure task names for privacy.
+- **Customizable UI:**  
+  - Colors and keybindings are configurable via `config.yml`.
+  - Toggle keybind help bar and UI wrap mode.
+
+## Getting Started
+
+1. **Build and Run:**
+   ```sh
+   cargo run --release
+   ```
+2. **Configuration:**
+   - Copy or edit config.yml in the project root to customize appearance and controls.
+3. **Exit**
+   - Quit with `q` or command mode `:wq`
+
+## Next Steps
+
+**Goal: Migrate JS App Features:**
+The goal of this TUI was to replicate the features of the previous [task manager](https://github.com/RohanAdwankar/task-js) I have been using but be fully usable without a mouse using VIM motions.
+There are several features missing currently like:
+* Search Bar
+* Activity Tracker
+* Alternative Task Views
