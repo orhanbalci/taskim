@@ -269,6 +269,17 @@ impl App {
                     }
                 }
             }
+        } else if self.config.save_task.matches(key.code, key.modifiers) {
+            match &self.month_view.selection.selection_type {
+                SelectionType::Task(task_id) => {
+                    // Edit existing task (same as insert_edit for task)
+                    if let Some(task) = self.data.events.iter().find(|t| &t.id == task_id) {
+                        let edit_state = TaskEditState::edit_task(task);
+                        self.mode = AppMode::TaskEdit(edit_state);
+                    }
+                }
+                _ => {}
+            }
         } else if self.config.insert_below.matches(key.code, key.modifiers) {
             // Insert task below current position (vim-style: o)
             let selected_date = self.month_view.get_selected_date(&self.data.events);
