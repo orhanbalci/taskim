@@ -48,3 +48,20 @@ There are several features missing currently like:
 - `:q`, `:quit`, `:wq`, `:x` 
   Quit the application.
 
+- `:help`, `:help <command>`
+  Show help for command mode.
+
+- `:seekeys`, `:set seekeys`  
+  Show keybindings bar.
+
+- `:nokeys`, `:set nokeys`  
+  Hide keybindings bar.
+
+- `:wrap`, `:set wrap`  
+  Enable UI text wrapping.
+
+- `:nowrap`, `:set nowrap`  
+  Disable UI text wrapping.
+
+- `:MM/DD/YYYY` or `:YYYY-MM-DD`  
+  Jump to a specific date in the calendar.

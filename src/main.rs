@@ -18,11 +18,12 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
-    style::{Style},
+    style::Style,
     text::{Line, Span},
     widgets::Paragraph,
     DefaultTerminal, Frame,
 };
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 enum AppMode {
@@ -68,6 +69,117 @@ impl CommandState {
             self.cursor_position += 1;
         }
     }
+}
+
+struct CommandInfo {
+    description: &'static str,
+}
+
+fn get_command_registry() -> HashMap<&'static str, CommandInfo> {
+    let mut map = HashMap::new();
+    map.insert(
+        "q",
+        CommandInfo {
+            description: "Quit the application.",
+        },
+    );
+    map.insert(
+        "quit",
+        CommandInfo {
+            description: "Quit the application.",
+        },
+    );
+    map.insert(
+        "wq",
+        CommandInfo {
+            description: "Quit the application.",
+        },
+    );
+    map.insert(
+        "x",
+        CommandInfo {
+            description: "Quit the application.",
+        },
+    );
+    map.insert(
+        "help",
+        CommandInfo {
+            description: "Show help for all commands or a specific command.",
+        },
+    );
+    map.insert(
+        "seekeys",
+        CommandInfo {
+            description: "Show keybindings bar.",
+        },
+    );
+    map.insert(
+        "set seekeys",
+        CommandInfo {
+            description: "Show keybindings bar.",
+        },
+    );
+    map.insert(
+        "nokeys",
+        CommandInfo {
+            description: "Hide keybindings bar.",
+        },
+    );
+    map.insert(
+        "set nokeys",
+        CommandInfo {
+            description: "Hide keybindings bar.",
+        },
+    );
+    map.insert(
+        "wrap",
+        CommandInfo {
+            description: "Enable UI text wrapping.",
+        },
+    );
+    map.insert(
+        "set wrap",
+        CommandInfo {
+            description: "Enable UI text wrapping.",
+        },
+    );
+    map.insert(
+        "nowrap",
+        CommandInfo {
+            description: "Disable UI text wrapping.",
+        },
+    );
+    map.insert(
+        "set nowrap",
+        CommandInfo {
+            description: "Disable UI text wrapping.",
+        },
+    );
+    map.insert(
+        "YYYY",
+        CommandInfo {
+            description: "Jump to a specific year (e.g., :2025).",
+        },
+    );
+    map.insert(
+        "MM/DD/YYYY",
+        CommandInfo {
+            description: "Jump to a specific date (e.g., :06/15/2025).",
+        },
+    );
+    map.insert(
+        "YYYY-MM-DD",
+        CommandInfo {
+            description: "Jump to a specific date (e.g., :2025-06-15).",
+        },
+    );
+    map.insert(
+        "DD",
+        CommandInfo {
+            description: "Jump to a specific day in the current month (e.g., :15).",
+        },
+    );
+    map
 }
 
 struct App {
@@ -208,9 +320,7 @@ impl App {
                         self.yanked_task = Some(task.clone());
 
                         // Track deletion for undo functionality
-                        self.undo_stack.push(Operation::DeleteTask {
-                            task,
-                        });
+                        self.undo_stack.push(Operation::DeleteTask { task });
 
                         // Check if there are any remaining tasks on the same date
                         let remaining_tasks = self.data.get_tasks_for_date(task_date);
@@ -325,9 +435,8 @@ impl App {
                     self.yanked_task = Some(deleted_task.clone());
 
                     // Track deletion for undo functionality
-                    self.undo_stack.push(Operation::DeleteTask {
-                        task: deleted_task,
-                    });
+                    self.undo_stack
+                        .push(Operation::DeleteTask { task: deleted_task });
 
                     // Check if there are any remaining tasks on the same date
                     let remaining_tasks = self.data.get_tasks_for_date(task_date);
@@ -353,9 +462,7 @@ impl App {
             // Undo last operation
             if let Some(operation) = self.undo_stack.undo() {
                 match operation {
-                    Operation::DeleteTask {
-                        task,
-                    } => {
+                    Operation::DeleteTask { task } => {
                         // Restore deleted task
                         self.data.events.push(task.clone());
 
@@ -393,9 +500,7 @@ impl App {
             // Redo last undone operation
             if let Some(operation) = self.undo_stack.redo() {
                 match operation {
-                    Operation::DeleteTask {
-                        task,
-                    } => {
+                    Operation::DeleteTask { task } => {
                         // Re-delete the task
                         self.data.events.retain(|t| t.id != task.id);
 
@@ -669,51 +774,57 @@ impl App {
 
     fn execute_command(&mut self, command: &str) -> Result<()> {
         let trimmed = command.trim();
-        if trimmed == ":set seekeys" || trimmed == "set seekeys" || trimmed == "seekeys" {
-            self.show_keybinds = true;
-            return Ok(());
-        } else if trimmed == ":set nokeys" || trimmed == "set nokeys" || trimmed == "nokeys" {
-            self.show_keybinds = false;
-            return Ok(());
+        let registry = get_command_registry();
+        // Special handling for help command
+        if trimmed.starts_with("help") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() == 1 {
+                // Show all commands
+                let mut help_text = String::from("Available commands:\n");
+                for (cmd, info) in &registry {
+                    help_text.push_str(&format!(":{:<15} - {}\n", cmd, info.description));
+                }
+                println!("{}", help_text); // For now, print to stdout; you may want to show in UI
+                return Ok(());
+            } else if parts.len() == 2 {
+                let query = parts[1];
+                if let Some(info) = registry.get(query) {
+                    println!(":{} - {}", query, info.description);
+                } else {
+                    println!("No help found for :{}", query);
+                }
+                return Ok(());
+            }
         }
-
         if trimmed.is_empty() {
             return Ok(());
         }
-
-        // Handle quit commands (vim-style)
+        // Match against known commands
         match trimmed {
             "q" | "quit" | "wq" | "x" => {
-                self.save()?;
                 self.should_exit = true;
                 return Ok(());
             }
-            _ => {}
-        }
-
-        // Handle help command
-        if trimmed == "help" {
-            // Show help in footer by temporarily switching modes - we'll handle this differently
-            // For now, just return Ok since help is shown in the UI
-            return Ok(());
-        }
-
-        // Handle wrap commands
-        match trimmed {
-            "set wrap" | "wrap" => {
+            "seekeys" | ":set seekeys" | "set seekeys" => {
+                self.show_keybinds = true;
+                return Ok(());
+            }
+            "nokeys" | ":set nokeys" | "set nokeys" => {
+                self.show_keybinds = false;
+                return Ok(());
+            }
+            "wrap" | "set wrap" => {
                 self.month_view.set_wrap(true);
                 return Ok(());
             }
-            "set nowrap" | "nowrap" => {
+            "nowrap" | "set nowrap" => {
                 self.month_view.set_wrap(false);
                 return Ok(());
             }
             _ => {}
         }
-
         // Try to parse as a date in various formats
         if let Some(date) = self.parse_date_command(trimmed) {
-            // Navigate to the specified date using the existing methods
             if date.month() != self.month_view.current_date.month()
                 || date.year() != self.month_view.current_date.year()
             {
@@ -721,14 +832,11 @@ impl App {
                 self.month_view.weeks =
                     MonthView::build_weeks_for_date(self.month_view.current_date);
             }
-
             self.month_view.selection = month_view::Selection {
                 selection_type: month_view::SelectionType::Day(date),
             };
-
             return Ok(());
         }
-
         Err(color_eyre::eyre::eyre!(
             "Unknown command: {}. Type ':help' for available commands.",
             trimmed
@@ -844,51 +952,90 @@ impl App {
             AppMode::Command(state) => {
                 if state.show_help {
                     let help_lines = vec![
+                        Line::from(vec![Span::styled(
+                            "Date Navigation Commands:",
+                            Style::default().fg(self.config.ui_colors.selected_task_fg),
+                        )]),
                         Line::from(vec![
-                            Span::styled("Date Navigation Commands:", Style::default().fg(self.config.ui_colors.selected_task_fg)),
-                        ]),
-                        Line::from(vec![
-                            Span::styled("YYYY", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                "YYYY",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Go to year (e.g., 2024) | "),
-                            Span::styled("DD", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                "DD",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Go to day in current month (e.g., 15)"),
                         ]),
                         Line::from(vec![
-                            Span::styled("MM/DD/YYYY", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                "MM/DD/YYYY",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Go to specific date (e.g., 06/15/2024)"),
                         ]),
                         Line::from(vec![
-                            Span::styled("Quit Commands:", Style::default().fg(self.config.ui_colors.completed_task_fg)),
+                            Span::styled(
+                                "Quit Commands:",
+                                Style::default().fg(self.config.ui_colors.completed_task_fg),
+                            ),
                             Span::raw(" "),
-                            Span::styled(":q", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                ":q",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Quit | "),
                         ]),
                         Line::from(vec![
-                            Span::styled("Display Commands:", Style::default().fg(self.config.ui_colors.completed_task_fg)),
+                            Span::styled(
+                                "Display Commands:",
+                                Style::default().fg(self.config.ui_colors.completed_task_fg),
+                            ),
                             Span::raw(" "),
-                            Span::styled(":set wrap", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                ":set wrap",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Enable text wrapping | "),
-                            Span::styled(":set nowrap", Style::default().fg(self.config.ui_colors.selected_task_bg)),
+                            Span::styled(
+                                ":set nowrap",
+                                Style::default().fg(self.config.ui_colors.selected_task_bg),
+                            ),
                             Span::raw(" - Disable text wrapping"),
                         ]),
                         Line::from(vec![
-                            Span::styled(":help", Style::default().fg(self.config.ui_colors.selected_completed_task_fg)),
+                            Span::styled(
+                                ":help",
+                                Style::default()
+                                    .fg(self.config.ui_colors.selected_completed_task_fg),
+                            ),
                             Span::raw(" - Toggle this help | "),
-                            Span::styled("Esc", Style::default().fg(self.config.ui_colors.selected_completed_task_bg)),
+                            Span::styled(
+                                "Esc",
+                                Style::default()
+                                    .fg(self.config.ui_colors.selected_completed_task_bg),
+                            ),
                             Span::raw(" - Exit command mode"),
                         ]),
                     ];
-                    let help_paragraph = Paragraph::new(help_lines)
-                        .style(Style::default().fg(self.config.ui_colors.default_fg).bg(self.config.ui_colors.default_bg));
+                    let help_paragraph = Paragraph::new(help_lines).style(
+                        Style::default()
+                            .fg(self.config.ui_colors.default_fg)
+                            .bg(self.config.ui_colors.default_bg),
+                    );
                     frame.render_widget(help_paragraph, area);
                 } else {
                     let command_line = format!(":{}", state.input);
-                    let command_paragraph = Paragraph::new(command_line.as_str())
-                        .style(Style::default().fg(self.config.ui_colors.default_fg).bg(self.config.ui_colors.default_bg));
+                    let command_paragraph = Paragraph::new(command_line.as_str()).style(
+                        Style::default()
+                            .fg(self.config.ui_colors.default_fg)
+                            .bg(self.config.ui_colors.default_bg),
+                    );
                     frame.render_widget(command_paragraph, area);
                     frame.set_cursor_position(Position::new(
                         area.x + 1 + state.cursor_position as u16,
-                        area.y
+                        area.y,
                     ));
                 }
             }
@@ -896,14 +1043,15 @@ impl App {
                 if self.show_keybinds {
                     let spans = self.config.get_normal_mode_help_spans(
                         self.undo_stack.can_undo(),
-                        self.undo_stack.can_redo()
+                        self.undo_stack.can_redo(),
                     );
                     let help_text = vec![Line::from(spans)];
                     let footer = Paragraph::new(help_text)
                         .style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(footer, area);
                 } else {
-                    let footer = Paragraph::new("").style(Style::default().fg(self.config.ui_colors.default_fg));
+                    let footer = Paragraph::new("")
+                        .style(Style::default().fg(self.config.ui_colors.default_fg));
                     frame.render_widget(footer, area);
                 }
             }
