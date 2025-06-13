@@ -26,3 +26,5 @@ yarn-error.log*
 /ratatui
 taskim/task_manager_data.json
 taskim/task-manager-data.json
+/target
+task_manager_data.json
