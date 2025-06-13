@@ -683,17 +683,7 @@ impl App {
 
         // Handle quit commands (vim-style)
         match trimmed {
-            "q" | "quit" => {
-                self.should_exit = true;
-                return Ok(());
-            }
-            "q!" | "quit!" => {
-                // Force quit without saving
-                self.should_exit = true;
-                return Ok(());
-            }
-            "wq" | "x" => {
-                // Write and quit (save and exit)
+            "q" | "quit" | "wq" | "x" => {
                 self.save()?;
                 self.should_exit = true;
                 return Ok(());
@@ -872,10 +862,6 @@ impl App {
                             Span::raw(" "),
                             Span::styled(":q", Style::default().fg(self.config.ui_colors.selected_task_bg)),
                             Span::raw(" - Quit | "),
-                            Span::styled(":wq", Style::default().fg(self.config.ui_colors.selected_task_bg)),
-                            Span::raw(" - Save & quit | "),
-                            Span::styled(":q!", Style::default().fg(self.config.ui_colors.selected_task_bg)),
-                            Span::raw(" - Force quit"),
                         ]),
                         Line::from(vec![
                             Span::styled("Display Commands:", Style::default().fg(self.config.ui_colors.completed_task_fg)),

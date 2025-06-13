@@ -42,3 +42,9 @@ There are several features missing currently like:
 * Search Bar
 * Activity Tracker
 * Alternative Task Views
+
+### Command Mode (`:`) Reference
+
+- `:q`, `:quit`, `:wq`, `:x` 
+  Quit the application.
+
