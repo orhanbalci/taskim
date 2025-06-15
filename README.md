@@ -1,5 +1,7 @@
 # Taskim
 
+![TUI Demo](demo.gif)
+
 Taskim is a terminal-based task manager built with Rust and [ratatui](https://github.com/ratatui-org/ratatui). It provides a Vim-inspired interface for managing tasks, navigating months, and customizing your workflow.
 
 ## Features
