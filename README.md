@@ -78,5 +78,8 @@ That being said, here are some goals for the future:
 - `:nowrap`, `:set nowrap`  
   Disable UI text wrapping.
 
-- `:MM/DD/YYYY`, `:YYYY-MM-DD`, `DD`, `YYYY`
+- `:MM/DD/YYYY`, `:YYYY-MM-DD`, `:DD`, `:YYYY`
   Jump to a specific date in the calendar.
+
+### Config Reference
+- For the color customization options outside of the named colors, I use the Ratatui indexed colors. You can see how the numbers correspond to the colors [here](https://github.com/ratatui/ratatui/blob/main/examples/README.md#color-explorer).
