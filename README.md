@@ -26,12 +26,18 @@ Taskim is a terminal-based task manager built with Rust and [ratatui](https://gi
 ## Getting Started
 
 1. **Build and Run:**
+   For this you can either clone the repo and use:
    ```sh
    cargo run --release
    ```
-2. **Configuration:**
+   Or, you can run
+   ```
+   cargo install taskim
+   taskim
+   ```
+3. **Configuration:**
    - Copy or edit config.yml in the project root to customize appearance and controls.
-3. **Exit**
+4. **Exit**
    - Quit with `q` or command mode `:wq`
 
 ## Motivation / Next Steps
