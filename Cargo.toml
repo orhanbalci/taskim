@@ -2,6 +2,12 @@
 name = "taskim"
 version = "0.1.0"
 edition = "2021"
+authors = ["Rohan Adwankar <rohan.adwankar@gmail.com>"]
+description = "TUI Task Manager with vim-ish motions"
+repository = "https://github.com/RohanAdwankar/taskim"
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["task","vim","neovim","todo"]
 
 [dependencies]
 ratatui = "0.28"
