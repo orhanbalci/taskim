@@ -1,3 +1,4 @@
+mod commands;
 mod config;
 mod data;
 mod month_view;
@@ -5,7 +6,6 @@ mod task;
 mod task_edit;
 mod undo;
 mod utils;
-mod commands;
 
 use crate::data::{load_data, save_data};
 use crate::month_view::{render_month_view, MonthView, SelectionType};
@@ -17,7 +17,7 @@ use commands::get_command_registry;
 
 use chrono::{Datelike, Local, Timelike};
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
@@ -593,20 +593,22 @@ impl App {
         key: crossterm::event::KeyEvent,
         state: &mut TaskEditState,
     ) -> Result<bool> {
-        if self.config.cancel_edit.matches(key.code, key.modifiers) {
-            // Cancel edit
-            return Ok(true);
-        } else if self.config.save_task.matches(key.code, key.modifiers) {
-            // Save task
-            if !state.title.trim().is_empty() {
+        if key.kind == KeyEventKind::Press {
+            if self.config.cancel_edit.matches(key.code, key.modifiers) {
+                // Cancel edit
                 return Ok(true);
+            } else if self.config.save_task.matches(key.code, key.modifiers) {
+                // Save task
+                if !state.title.trim().is_empty() {
+                    return Ok(true);
+                }
+            } else if self.config.switch_field.matches(key.code, key.modifiers) {
+                state.switch_field();
+            } else if self.config.backspace.matches(key.code, key.modifiers) {
+                state.remove_char();
+            } else if let KeyCode::Char(ch) = key.code {
+                state.add_char(ch);
             }
-        } else if self.config.switch_field.matches(key.code, key.modifiers) {
-            state.switch_field();
-        } else if self.config.backspace.matches(key.code, key.modifiers) {
-            state.remove_char();
-        } else if let KeyCode::Char(ch) = key.code {
-            state.add_char(ch);
         }
         Ok(false)
     }
@@ -712,7 +714,10 @@ impl App {
             };
             return Ok(());
         }
-        Err(format!("Unknown command: {}. Type ':help' for available commands.", trimmed))
+        Err(format!(
+            "Unknown command: {}. Type ':help' for available commands.",
+            trimmed
+        ))
     }
 
     fn parse_date_command(&self, input: &str) -> Option<chrono::NaiveDate> {
