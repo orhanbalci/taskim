@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use chrono::Local;
+
 pub struct CommandInfo {
     pub description: &'static str,
     pub exec: fn(&mut crate::App, &str) -> Result<(), String>,
@@ -84,6 +86,16 @@ pub fn get_command_registry() -> HashMap<&'static str, CommandInfo> {
         CommandInfo {
             description: "Jump to a specific day in the current month (e.g., :15).",
             exec: |_, _| Ok(()), // Handled in main.rs parse_date_command
+        },
+    );
+     map.insert(
+        "today",
+        CommandInfo {
+            description: "Jump today",
+            exec: |app, _| {
+                app.month_view.navigate_to_date(Local::now().date_naive());
+                Ok(())
+            },
         },
     );
     map
