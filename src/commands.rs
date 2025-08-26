@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use chrono::Local;
-
 pub struct CommandInfo {
     pub description: &'static str,
     pub exec: fn(&mut crate::App, &str) -> Result<(), String>,
@@ -93,7 +91,7 @@ pub fn get_command_registry() -> HashMap<&'static str, CommandInfo> {
         CommandInfo {
             description: "Jump today",
             exec: |app, _| {
-                app.month_view.navigate_to_date(Local::now().date_naive());
+                app.month_view.go_to_today();
                 Ok(())
             },
         },

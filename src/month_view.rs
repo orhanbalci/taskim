@@ -76,7 +76,7 @@ impl MonthView {
     }
 
     // Helper method to navigate to a date, handling month transitions if needed
-    pub fn navigate_to_date(&mut self, target_date: NaiveDate) {
+    fn navigate_to_date(&mut self, target_date: NaiveDate) {
         // Check if we need to change months
         if target_date.month() != self.current_date.month()
             || target_date.year() != self.current_date.year()
